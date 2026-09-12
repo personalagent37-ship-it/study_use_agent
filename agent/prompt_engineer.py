@@ -24,7 +24,7 @@ class HumanPromptEngineer:
         is_practical_chat = bool(re.search(r"\b(chat\s*bot|chat|conversational|real\s*world|production|implementation)\b", q_lower))
         is_deep_tech = bool(re.search(r"\b(deep\s*dive|in\s*depth|mathematical|derivation|algorithms?|formal|theory)\b", q_lower))
         is_comparison = bool(re.search(r"\b(vs|versus|difference\s+between|compare|comparison)\b", q_lower))
-        is_diagram_requested = bool(re.search(r"\b(diagram|system\s+design|architecture|flowchart|sketch|blueprint|draw|schematic|pipeline\s+diagram)\b", q_lower))
+        is_diagram_requested = bool(re.search(r"\b(dia?gr[ae]m|d[ei]s[ei]?gn|archite[ck]t|flow\s*chart|sketch|blueprint|draw|schematic)\b", q_lower))
 
         return {
             "is_simple_words": is_simple_words,
@@ -47,14 +47,14 @@ class HumanPromptEngineer:
 
         # Remove conversational lead-ins
         text = re.sub(
-            r"^(can\s+you\s+)?(please\s+)?(tell\s+me|explain|what\s+(is|are|does|was)|how\s+(does|do|to)|give\s+me(\s+notes\s+on)?|i\s+want(\s+to\s+know|\s+notes\s+on)?)\s*",
+            r"^(can\s+you\s+)?(please\s+)?(tell\s+me|explain|what\s+(is|are|does|was)|how\s+(does|do|to)|give\s+me(\s+notes\s+on)?|i\s+want(\s+to\s+know|\s+notes\s+on)?|make\s+(a\s+)?notes?\s+(on|about)?|prepare\s+(a\s+)?notes?\s+(on|about)?|write\s+(a\s+)?notes?\s+(on|about)?)\s*",
             "",
             text,
             flags=re.IGNORECASE
         )
 
-        # Remove trailing style instructions for prompt extraction
-        text = re.sub(r"\b(in\s+simple\s+words?|in\s+easy\s+language|point\s+to\s+point|step\s*by\s*step)\b", "", text, flags=re.IGNORECASE)
+        # Remove trailing style instructions and typos for prompt extraction
+        text = re.sub(r"\b(in\s+simple\s+words?|in\s+easy\s+language|point\s+to\s+point|step\s*by\s*step|i\s+wnat|i\s+want|plz|please)\b", "", text, flags=re.IGNORECASE)
 
         # Clean punctuation and extra spaces
         cleaned = re.sub(r"\s+", " ", text).strip().strip("?:;,. ")

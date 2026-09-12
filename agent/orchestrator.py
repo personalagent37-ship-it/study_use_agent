@@ -55,7 +55,10 @@ def sanitize_notes_output(raw_markdown: str, topic: str = "", subject: str = "",
     cleaned = re.sub(r"^```(?:markdown)?\s*\n", "", cleaned, flags=re.IGNORECASE)
     cleaned = re.sub(r"\n```\s*$", "", cleaned).strip()
 
-    # 4. Guarantee markdown title header exists
+    # 4. Clean leading markdown headers on custom tags
+    cleaned = re.sub(r"#{1,6}\s*(\[(?:SYSTEM_DESIGN|FLOW_STEP|FORMULA_BOX|STICKY_|MEMORY_TRICK))", r"\1", cleaned)
+
+    # 5. Guarantee markdown title header exists
     if not cleaned:
         cleaned = f"# 📖 {topic}\n**Subject**: {subject} | **Reference**: *{reference}*\n\n{raw_markdown.strip()}"
     elif not cleaned.startswith("#"):
@@ -444,7 +447,9 @@ class StudyAgentOrchestrator:
         # On-Demand System Design Diagram Generation
         diagram_png_path = None
         diagram_svg = None
-        if is_diagram_requested:
+        should_generate_diagram = is_diagram_requested or ("[SYSTEM_DESIGN:" in full_notes_markdown)
+
+        if should_generate_diagram:
             # Guarantee [SYSTEM_DESIGN: ...] exists in notes if requested
             if "[SYSTEM_DESIGN:" not in full_notes_markdown:
                 arch = SystemDesignParser.fallback_architecture_for_topic(intent.cleaned_topic)
@@ -529,7 +534,7 @@ class StudyAgentOrchestrator:
         # 5. Compile Documents (PDF, PPTX, DOCX)
         safe_filename = re.sub(r"[^\w\-_\. ]", "_", intent.cleaned_topic).strip().replace(" ", "_")
         files = {}
-        active_diagram_path = diagram_png_path if (is_diagram_requested and diagram_png_path and Path(diagram_png_path).exists()) else None
+        active_diagram_path = diagram_png_path if (should_generate_diagram and diagram_png_path and Path(diagram_png_path).exists()) else None
 
         for fmt in requested_formats:
             try:
@@ -566,7 +571,7 @@ class StudyAgentOrchestrator:
             "files": files,
             "has_diagram": bool(active_diagram_path),
             "diagram_image": f"/api/download/{active_diagram_path.name}" if active_diagram_path else None,
-            "diagram_svg": diagram_svg if is_diagram_requested else None,
+            "diagram_svg": diagram_svg if should_generate_diagram else None,
             "color": book_color,
             "created_at": datetime.now().strftime("%B %d, %Y • %I:%M %p")
         }

@@ -105,6 +105,40 @@ class HumanGUIAgent:
 
         return self.driver
 
+    def insert_full_prompt(self, element, text: str):
+        """Insert the complete multi-line prompt in ONE GO without triggering premature submits on newlines."""
+        try:
+            # Atomic JavaScript insertion for rich-textareas (Gemini & Claude)
+            self.driver.execute_script("""
+                const el = arguments[0];
+                const text = arguments[1];
+                el.focus();
+                // Select all inside contenteditable
+                const sel = window.getSelection();
+                const range = document.createRange();
+                range.selectNodeContents(el);
+                sel.removeAllRanges();
+                sel.addRange(range);
+                // Insert text atomically
+                const ok = document.execCommand('insertText', false, text);
+                if (!ok) {
+                    el.innerText = text;
+                }
+                el.dispatchEvent(new Event('input', { bubbles: true }));
+                el.dispatchEvent(new Event('change', { bubbles: true }));
+            """, element, text)
+            time.sleep(0.6)
+        except Exception as js_err:
+            logger.warning(f"JS prompt insertion fallback: {js_err}")
+            # Fallback: type lines with Shift+Enter so Enter never submits prematurely
+            lines = text.split("\n")
+            for idx, line in enumerate(lines):
+                if line:
+                    element.send_keys(line)
+                if idx < len(lines) - 1:
+                    element.send_keys(Keys.SHIFT, Keys.ENTER)
+                time.sleep(0.02)
+
     def human_typing(self, element, text: str, delay_range: tuple = (0.02, 0.06)):
         """Simulate human-like keystroke intervals."""
         for char in text:
@@ -209,11 +243,11 @@ class HumanGUIAgent:
             input_box.click()
             time.sleep(0.5)
 
-            self.human_typing(input_box, prompt)
-            time.sleep(0.8)
+            self.insert_full_prompt(input_box, prompt)
+            time.sleep(1.0)
 
             send_btns = driver.find_elements(By.CSS_SELECTOR, "button[aria-label*='Send'], button[class*='send']")
-            if send_btns:
+            if send_btns and send_btns[0].is_enabled():
                 send_btns[0].click()
             else:
                 input_box.send_keys(Keys.ENTER)
@@ -291,11 +325,11 @@ class HumanGUIAgent:
             input_box.click()
             time.sleep(0.5)
 
-            self.human_typing(input_box, prompt)
-            time.sleep(0.8)
+            self.insert_full_prompt(input_box, prompt)
+            time.sleep(1.0)
 
             send_btns = driver.find_elements(By.CSS_SELECTOR, "button[aria-label*='Send'], button.send-button")
-            if send_btns:
+            if send_btns and send_btns[0].is_enabled():
                 send_btns[0].click()
             else:
                 input_box.send_keys(Keys.ENTER)

@@ -960,10 +960,11 @@ function parseHandwrittenTags(rawMarkdown) {
   });
 
   // 3. System Design & Architecture Blueprint: [SYSTEM_DESIGN: ... ]
-  parsed = parsed.replace(/\[SYSTEM_DESIGN:\s*([\s\S]*?)\]/gi, (match, content) => {
+  let systemDesignHtml = "";
+  parsed = parsed.replace(/(?:#{1,6}\s*)?\[SYSTEM_DESIGN:\s*([\s\S]*?)\]/gi, (match, content) => {
     // If backend generated a crisp hand-drawn SVG, embed it directly into the ruled page!
     if (typeof currentPackage !== "undefined" && currentPackage && currentPackage.diagram_svg) {
-      return `
+      systemDesignHtml = `
         <div class="system-design-container">
           <div class="system-design-header">
             <span class="system-design-badge">🏛️ SYSTEM DESIGN &amp; ARCHITECTURE BLUEPRINT</span>
@@ -974,6 +975,7 @@ function parseHandwrittenTags(rawMarkdown) {
           </div>
         </div>
       `;
+      return "\n\n__ALEXANDRIA_SYSTEM_DESIGN_BLOCK__\n\n";
     }
 
     // Fallback: Parse into interactive notebook card
@@ -1013,7 +1015,7 @@ function parseHandwrittenTags(rawMarkdown) {
 
     const calloutsHtml = callouts.map(c => `<li>${c}</li>`).join('');
 
-    return `
+    systemDesignHtml = `
       <div class="system-design-container">
         <div class="system-design-header">
           <span class="system-design-badge">🏛️ SYSTEM DESIGN &amp; ARCHITECTURE BLUEPRINT</span>
@@ -1030,6 +1032,7 @@ function parseHandwrittenTags(rawMarkdown) {
         </div>
       </div>
     `;
+    return "\n\n__ALEXANDRIA_SYSTEM_DESIGN_BLOCK__\n\n";
   });
 
   // 4. Formula Box: [FORMULA_BOX: ... ]
@@ -1050,10 +1053,15 @@ function parseHandwrittenTags(rawMarkdown) {
   });
 
   // Convert markdown to HTML using marked
+  let finalHtml = parsed;
   if (typeof marked !== "undefined") {
-    return marked.parse(parsed);
+    finalHtml = marked.parse(parsed);
   }
-  return parsed;
+
+  if (systemDesignHtml) {
+    finalHtml = finalHtml.replace(/<p>\s*__ALEXANDRIA_SYSTEM_DESIGN_BLOCK__\s*<\/p>|__ALEXANDRIA_SYSTEM_DESIGN_BLOCK__/g, systemDesignHtml);
+  }
+  return finalHtml;
 }
 
 /* --------------------------------------------------------------------------
