@@ -72,7 +72,7 @@ class GenerateRequest(BaseModel):
     topic: str
     model: str = "google/gemini-3.8-flash"
     subject: str = ""
-    formats: list[str] = ["handwritten", "pdf"]
+    formats: list[str] = ["handwritten", "pdf", "docx"]
     gui_agent: bool = False
     gui_target: str = "auto"
     headless: bool = False
@@ -90,6 +90,7 @@ def get_gui_agent_status():
         "profile_dir": str(profile_dir),
         "profile_exists": profile_dir.exists(),
         "supported_targets": [
+            {"id": "all", "name": "🌟 All Engines Combined", "requires_login": False, "badge": "Claude + Gemini + Perplexity"},
             {"id": "perplexity", "name": "Perplexity AI Web", "requires_login": False, "badge": "Instant • No Login"},
             {"id": "claude", "name": "Claude AI Web", "requires_login": True, "badge": "1-Time Login in Chrome"},
             {"id": "gemini", "name": "Google Gemini Web", "requires_login": True, "badge": "1-Time Google Sign-in"},

@@ -262,6 +262,7 @@ class StudyAgentOrchestrator:
         # 2. Research & Academic Content Retrieval (GUI Agent or Serper Scraper)
         active_gui_agent = use_gui_agent or getattr(intent, "use_gui_agent", False)
         active_gui_target = gui_target if (gui_target and gui_target != "auto") else getattr(intent, "gui_target", "auto")
+        gui_res = None
         web_context = ""
         sources_list = []
         search_results = []
@@ -340,6 +341,20 @@ class StudyAgentOrchestrator:
             subject=intent.subject_name,
             reference=intent.target_book
         )
+
+        # Append complete web AI research output if GUI browser agent was used
+        if active_gui_agent and gui_res and gui_res.get("content"):
+            source_label = gui_res.get("source", "Web AI Engine")
+            raw_web_content = gui_res.get("content").strip()
+            web_url = gui_res.get("url", "")
+
+            full_notes_markdown += (
+                f"\n\n---\n\n"
+                f"## 🌐 Complete Web AI Research Output ({source_label})\n"
+                f"> 🤖 **Autonomous Human GUI Agent Transcript**: The complete text below was retrieved directly by automated Chrome browser from **{source_label}**"
+                f"{f' ({web_url})' if web_url else ''}.\n\n"
+                f"{raw_web_content}\n"
+            )
 
         # 4. Summary synthesis
         summary_prompt = EXECUTIVE_SUMMARY_PROMPT.format(

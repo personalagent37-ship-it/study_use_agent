@@ -398,6 +398,45 @@ class HumanGUIAgent:
                 "error": str(e)
             }
 
+    def research_all(self, topic: str, prompt: Optional[str] = None) -> Dict[str, Any]:
+        """Collect and combine grounded research across web platforms (Perplexity, Claude, Gemini, Google)."""
+        query_prompt = prompt or f"Provide detailed academic explanations, core definitions, mechanisms, and key formulas for: {topic}"
+        sections = []
+        combined_sources = []
+
+        # 1. Perplexity (Instant Web Research)
+        p_res = self.research_perplexity(f"Comprehensive academic study notes and key formulas for: {topic}")
+        if p_res.get("content"):
+            sections.append(f"### 🟢 Output from Perplexity AI Web\n\n{p_res.get('content')}")
+            combined_sources.extend(p_res.get("sources", []))
+
+        # 2. Claude AI (if logged in)
+        c_res = self.research_claude(query_prompt)
+        if c_res.get("content") and not c_res.get("needs_login"):
+            sections.append(f"### 🟣 Output from Claude AI Web\n\n{c_res.get('content')}")
+
+        # 3. Gemini Web (if logged in)
+        g_res = self.research_gemini(query_prompt)
+        if g_res.get("content") and not g_res.get("needs_login"):
+            sections.append(f"### 🔵 Output from Google Gemini Web\n\n{g_res.get('content')}")
+
+        # 4. Google Search Overview (if only 1 source so far)
+        if len(sections) < 2:
+            goog_res = self.research_google(topic)
+            if goog_res.get("content"):
+                sections.append(f"### 🟡 Output from Google Search & AI Overview\n\n{goog_res.get('content')}")
+                combined_sources.extend(goog_res.get("sources", []))
+
+        full_content = "\n\n---\n\n".join(sections) if sections else ""
+
+        return {
+            "source": f"Multi-Platform GUI Agent ({len(sections)} Web Engines)",
+            "success": bool(full_content),
+            "content": full_content,
+            "sources": combined_sources,
+            "url": "https://claude.ai • https://gemini.google.com • https://perplexity.ai"
+        }
+
     # --------------------------------------------------------------------------
     # UNIFIED ENTRYPOINT
     # --------------------------------------------------------------------------
@@ -406,7 +445,10 @@ class HumanGUIAgent:
         target_lower = (target or "perplexity").lower().strip()
         query_prompt = prompt or f"Provide detailed academic textbook explanations, core definitions, mechanisms, and key formulas for: {topic}"
 
-        if "claude" in target_lower:
+        if any(w in target_lower for w in ["all", "combined", "multi", "both"]):
+            return self.research_all(topic, prompt)
+
+        elif "claude" in target_lower:
             res = self.research_claude(query_prompt)
             if res.get("needs_login") or not res.get("success"):
                 logger.warning("Claude Web requires login. Auto-routing to Perplexity Web for instant research...")

@@ -703,7 +703,7 @@ function initForm() {
     const checkedBoxes = form.querySelectorAll('input[name="format"]:checked');
     const formats = Array.from(checkedBoxes).map((cb) => cb.value);
     if (formats.length === 0) {
-      formats.push("handwritten", "pdf");
+      formats.push("handwritten", "pdf", "docx");
     }
 
     // UI state: generating
@@ -715,8 +715,15 @@ function initForm() {
     if (briefingCard && briefingText) {
       briefingCard.classList.remove("hidden");
       if (isGuiAgentActive) {
-        const targetLabel = selectedGuiTarget === "claude" ? "Claude AI Web" : (selectedGuiTarget === "gemini" ? "Google Gemini Web" : (selectedGuiTarget === "google" ? "Google Search" : "Perplexity Web"));
-        briefingText.textContent = `🤖 Human GUI Browser Agent: Opening ${targetLabel} in Chrome to retrieve authoritative academic content...`;
+        const targetLabels = {
+          "all": "All Web Engines (Claude + Gemini + Perplexity)",
+          "claude": "Claude AI Web",
+          "gemini": "Google Gemini Web",
+          "google": "Google Search",
+          "perplexity": "Perplexity Web"
+        };
+        const targetLabel = targetLabels[selectedGuiTarget] || "Perplexity Web";
+        briefingText.textContent = `🤖 Human GUI Browser Agent: Querying ${targetLabel} in Chrome to retrieve authoritative academic content...`;
       } else {
         briefingText.textContent = `Analyzing academic literature and citations via ${selectedModel.split('/')[1] || selectedModel}...`;
       }
@@ -805,7 +812,7 @@ function runStepperAnimation(isGui = false, target = "perplexity") {
   const compileNode = document.getElementById("step-compile");
 
   if (isGui) {
-    const targetName = target === "claude" ? "Claude AI" : (target === "gemini" ? "Gemini" : (target === "google" ? "Google" : "Perplexity"));
+    const targetName = target === "all" ? "All Web Engines" : (target === "claude" ? "Claude AI" : (target === "gemini" ? "Gemini" : (target === "google" ? "Google" : "Perplexity")));
     if (searchNode) {
       const title = searchNode.querySelector(".node-title");
       const desc = searchNode.querySelector(".node-desc");
@@ -816,7 +823,7 @@ function runStepperAnimation(isGui = false, target = "perplexity") {
       const title = scrapeNode.querySelector(".node-title");
       const desc = scrapeNode.querySelector(".node-desc");
       if (title) title.textContent = `🌐 ${targetName} Web`;
-      if (desc) desc.textContent = "Navigating & human typing";
+      if (desc) desc.textContent = target === "all" ? "Claude, Gemini & Perplexity" : "Navigating & human typing";
     }
     if (synthNode) {
       const title = synthNode.querySelector(".node-title");
@@ -828,7 +835,7 @@ function runStepperAnimation(isGui = false, target = "perplexity") {
       const title = compileNode.querySelector(".node-title");
       const desc = compileNode.querySelector(".node-desc");
       if (title) title.textContent = "📖 Alexandria Synthesis";
-      if (desc) desc.textContent = "Compiling notes & PDF";
+      if (desc) desc.textContent = "Compiling notes, DOCX & PDF";
     }
   } else {
     if (searchNode) {

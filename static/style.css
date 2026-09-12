@@ -2481,6 +2481,11 @@ body {
   box-shadow: 0 0 6px #F59E0B;
 }
 
+.target-dot.coral {
+  background: #F43F5E;
+  box-shadow: 0 0 6px #F43F5E;
+}
+
 .target-badge {
   font-size: 10.5px;
   font-weight: 600;
