@@ -931,7 +931,7 @@ function parseHandwrittenTags(rawMarkdown) {
   let parsed = rawMarkdown;
 
   // 0. Strip backticks around all special tags: `[HL: ...]` -> [HL: ...]
-  parsed = parsed.replace(/`(\[(?:HL|STICKY_|FORMULA_|FLOW_|MEMORY_)[^`]+\])`/gi, '$1');
+  parsed = parsed.replace(/`(\[(?:HL|STICKY_|FORMULA_|FLOW_|MEMORY_|SYSTEM_DESIGN)[^`]+\])`/gi, '$1');
 
   // 1. Highlighters: [HL: yellow | text], [HL: green | text], [HL: pink | text]
   parsed = parsed.replace(/\[HL:\s*yellow\s*\|\s*([^\]]+)\]/gi, '<span class="hl-yellow">$1</span>');
@@ -959,18 +959,91 @@ function parseHandwrittenTags(rawMarkdown) {
     return `<div class="sticky-note sticky-fact"><div class="sticky-note-header">⭐ Amazing Fact</div>${content.trim()}</div>`;
   });
 
-  // 3. Formula Box: [FORMULA_BOX: ... ]
+  // 3. System Design & Architecture Blueprint: [SYSTEM_DESIGN: ... ]
+  parsed = parsed.replace(/\[SYSTEM_DESIGN:\s*([\s\S]*?)\]/gi, (match, content) => {
+    // If backend generated a crisp hand-drawn SVG, embed it directly into the ruled page!
+    if (typeof currentPackage !== "undefined" && currentPackage && currentPackage.diagram_svg) {
+      return `
+        <div class="system-design-container">
+          <div class="system-design-header">
+            <span class="system-design-badge">🏛️ SYSTEM DESIGN &amp; ARCHITECTURE BLUEPRINT</span>
+            ${currentPackage.diagram_image ? `<a href="${currentPackage.diagram_image}" target="_blank" class="btn-diagram-download">📥 Open Full Blueprint (PNG)</a>` : ''}
+          </div>
+          <div class="system-design-canvas">
+            ${currentPackage.diagram_svg}
+          </div>
+        </div>
+      `;
+    }
+
+    // Fallback: Parse into interactive notebook card
+    const lines = content.trim().split('\n');
+    let title = "System Architecture Blueprint";
+    const nodes = [];
+    const callouts = [];
+    let section = "general";
+
+    lines.forEach(line => {
+      const trimmed = line.trim();
+      if (trimmed.toLowerCase().startsWith("title:")) {
+        title = trimmed.substring(6).trim();
+      } else if (trimmed.toLowerCase().startsWith("nodes:") || trimmed.toLowerCase().startsWith("components:")) {
+        section = "nodes";
+      } else if (trimmed.toLowerCase().startsWith("callouts:") || trimmed.toLowerCase().startsWith("tradeoffs:")) {
+        section = "callouts";
+      } else if (trimmed.startsWith("-") || trimmed.startsWith("•") || trimmed.startsWith("*")) {
+        const item = trimmed.replace(/^[-•*]\s*/, "");
+        if (section === "nodes") {
+          const parts = item.split("|").map(p => p.trim());
+          nodes.push({ name: parts[0] || "Stage", role: parts[1] || "", note: parts[2] || "" });
+        } else {
+          callouts.push(item);
+        }
+      }
+    });
+
+    const nodesHtml = nodes.map((n, i) => `
+      <div class="diagram-blueprint-node">
+        <div class="node-number">0${i+1}</div>
+        <div class="node-name">${n.name}</div>
+        ${n.role ? `<div class="node-role">${n.role}</div>` : ''}
+        ${n.note ? `<div class="node-note">✏️ ${n.note}</div>` : ''}
+      </div>
+    `).join('<div class="diagram-connector-arrow">➔</div>');
+
+    const calloutsHtml = callouts.map(c => `<li>${c}</li>`).join('');
+
+    return `
+      <div class="system-design-container">
+        <div class="system-design-header">
+          <span class="system-design-badge">🏛️ SYSTEM DESIGN &amp; ARCHITECTURE BLUEPRINT</span>
+        </div>
+        <div class="system-design-blueprint-card">
+          <div class="blueprint-title">${title}</div>
+          <div class="blueprint-nodes-row">${nodesHtml}</div>
+          ${callouts.length ? `
+            <div class="blueprint-callouts">
+              <div class="callout-title">📌 Field Notes &amp; Architectural Trade-Offs:</div>
+              <ul>${calloutsHtml}</ul>
+            </div>
+          ` : ''}
+        </div>
+      </div>
+    `;
+  });
+
+  // 4. Formula Box: [FORMULA_BOX: ... ]
   parsed = parsed.replace(/\[FORMULA_BOX:\s*([\s\S]*?)\]/gi, (match, content) => {
     const formatted = content.trim().replace(/\n/g, '<br>');
     return `<div class="formula-box"><div class="formula-box-title">📐 Formula to Remember</div><div class="formula-content">${formatted}</div></div>`;
   });
 
-  // 4. Memory Trick: [MEMORY_TRICK: ... ]
+  // 5. Memory Trick: [MEMORY_TRICK: ... ]
   parsed = parsed.replace(/\[MEMORY_TRICK:\s*([\s\S]*?)\]/gi, (match, content) => {
     return `<div class="memory-trick-box"><span class="memory-trick-icon">🧠</span><div><strong>MEMORY TRICK:</strong> ${content.trim()}</div></div>`;
   });
 
-  // 5. Flow Steps: [FLOW_STEP: Step 1 -> Step 2 -> ... ]
+  // 6. Flow Steps: [FLOW_STEP: Step 1 -> Step 2 -> ... ]
   parsed = parsed.replace(/\[FLOW_STEP:\s*([^\]]+)\]/gi, (match, content) => {
     const parts = content.split(/->|➔/).map(s => `<span>${s.trim()}</span>`).join(' <span class="flow-step-arrow">➔</span> ');
     return `<div class="flow-step-box">${parts}</div>`;

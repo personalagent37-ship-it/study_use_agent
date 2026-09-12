@@ -4,7 +4,7 @@ from datetime import datetime
 from reportlab.lib.pagesizes import letter
 from reportlab.lib import colors
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
-from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, HRFlowable
+from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, HRFlowable, Image as RLImage
 from reportlab.pdfgen import canvas
 
 class NumberedCanvas(canvas.Canvas):
@@ -86,7 +86,12 @@ def _sanitize_for_reportlab(text: str) -> str:
     return text
 
 
-def generate_notes_pdf(topic: str, markdown_content: str, output_path: str | Path) -> str:
+def generate_notes_pdf(
+    topic: str,
+    markdown_content: str,
+    output_path: str | Path,
+    diagram_image_path: str | Path | None = None
+) -> str:
     """Generate an academic study guide PDF from markdown notes."""
     output_path = Path(output_path)
     output_path.parent.mkdir(parents=True, exist_ok=True)
@@ -219,10 +224,31 @@ def generate_notes_pdf(topic: str, markdown_content: str, output_path: str | Pat
             plain = plain.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
             return Paragraph(plain, style)
 
+    in_system_design = False
     for line in lines:
         stripped = line.strip()
         if not stripped:
             flush_callout()
+            continue
+
+        # System Design Block
+        if "[SYSTEM_DESIGN:" in stripped or stripped.startswith("[SYSTEM_DESIGN:"):
+            flush_callout()
+            if diagram_image_path and Path(diagram_image_path).exists():
+                try:
+                    story.append(Spacer(1, 8))
+                    img = RLImage(str(diagram_image_path), width=doc.width, height=doc.width * 0.52)
+                    story.append(img)
+                    story.append(Spacer(1, 8))
+                except Exception as img_err:
+                    pass
+            if not stripped.endswith("]"):
+                in_system_design = True
+            continue
+
+        if in_system_design:
+            if "]" in stripped:
+                in_system_design = False
             continue
 
         # Callout blockquote: > text

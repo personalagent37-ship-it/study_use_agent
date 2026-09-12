@@ -108,7 +108,12 @@ def _add_formatted_runs(paragraph, text: str):
         r = paragraph.add_run(token)
         r.font.name = "Calibri"
 
-def generate_notes_docx(topic: str, markdown_content: str, output_path: str | Path) -> str:
+def generate_notes_docx(
+    topic: str,
+    markdown_content: str,
+    output_path: str | Path,
+    diagram_image_path: str | Path | None = None
+) -> str:
     """Generate a clean, structured Microsoft Word (.docx) study notes document."""
     output_path = Path(output_path)
     output_path.parent.mkdir(parents=True, exist_ok=True)
@@ -157,8 +162,8 @@ def generate_notes_docx(topic: str, markdown_content: str, output_path: str | Pa
             i += 1
             continue
 
-        # 1. Custom Callout Blocks: [STICKY_THINK: ...], [STICKY_REMEMBER: ...], [FORMULA_BOX: ...], etc.
-        sticky_match = re.match(r"^\[(STICKY_THINK|STICKY_REMEMBER|STICKY_EXAM|STICKY_FACT|FORMULA_BOX|MEMORY_TRICK|FLOW_STEP):\s*(.*)", stripped, re.IGNORECASE)
+        # 1. Custom Callout Blocks: [STICKY_THINK: ...], [STICKY_REMEMBER: ...], [SYSTEM_DESIGN: ...], etc.
+        sticky_match = re.match(r"^\[(STICKY_THINK|STICKY_REMEMBER|STICKY_EXAM|STICKY_FACT|FORMULA_BOX|MEMORY_TRICK|FLOW_STEP|SYSTEM_DESIGN):\s*(.*)", stripped, re.IGNORECASE)
         if sticky_match:
             tag_type = sticky_match.group(1).upper()
             initial_text = sticky_match.group(2)
@@ -179,7 +184,18 @@ def generate_notes_docx(topic: str, markdown_content: str, output_path: str | Pa
 
             full_block_text = "\n".join(block_lines).strip()
 
-            if tag_type == "STICKY_THINK":
+            if tag_type == "SYSTEM_DESIGN":
+                if diagram_image_path and Path(diagram_image_path).exists():
+                    try:
+                        p_img = doc.add_paragraph()
+                        p_img.paragraph_format.space_before = Pt(8)
+                        p_img.paragraph_format.space_after = Pt(8)
+                        p_img.alignment = WD_ALIGN_PARAGRAPH.CENTER
+                        p_img.add_run().add_picture(str(diagram_image_path), width=Inches(6.4))
+                    except Exception as img_err:
+                        pass
+                _add_callout_box(doc, "🏛️ SYSTEM ARCHITECTURE & BLUEPRINT SPECIFICATION", full_block_text, "F0FDF4", RGBColor(22, 101, 52))
+            elif tag_type == "STICKY_THINK":
                 _add_callout_box(doc, "💡 INTUITIVE THINKING / MENTAL MODEL", full_block_text, "FFE4E6", RGBColor(190, 18, 60))
             elif tag_type == "STICKY_REMEMBER":
                 _add_callout_box(doc, "⭐ MUST REMEMBER / CORE DEFINITION", full_block_text, "FEF3C7", RGBColor(180, 83, 9))

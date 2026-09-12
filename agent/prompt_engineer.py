@@ -20,10 +20,11 @@ class HumanPromptEngineer:
         q_lower = (raw_query or "").lower().strip()
 
         is_simple_words = bool(re.search(r"\b(in\s+simple\s+words?|simple|eli5|for\s+dummies|easy\s+to\s+understand|layman|basic|simply)\b", q_lower))
-        is_step_by_step = bool(re.search(r"\b(step\s*by\s*step|how\s+it\s+works?|pipeline|workflow|architecture|mechanism|lifecycle)\b", q_lower))
+        is_step_by_step = bool(re.search(r"\b(step\s*by\s*step|how\s+it\s+works?|pipeline|workflow|mechanism|lifecycle)\b", q_lower))
         is_practical_chat = bool(re.search(r"\b(chat\s*bot|chat|conversational|real\s*world|production|implementation)\b", q_lower))
         is_deep_tech = bool(re.search(r"\b(deep\s*dive|in\s*depth|mathematical|derivation|algorithms?|formal|theory)\b", q_lower))
         is_comparison = bool(re.search(r"\b(vs|versus|difference\s+between|compare|comparison)\b", q_lower))
+        is_diagram_requested = bool(re.search(r"\b(diagram|system\s+design|architecture|flowchart|sketch|blueprint|draw|schematic|pipeline\s+diagram)\b", q_lower))
 
         return {
             "is_simple_words": is_simple_words,
@@ -31,6 +32,7 @@ class HumanPromptEngineer:
             "is_practical_chat": is_practical_chat,
             "is_deep_tech": is_deep_tech,
             "is_comparison": is_comparison,
+            "is_diagram_requested": is_diagram_requested,
         }
 
     @staticmethod
@@ -94,6 +96,10 @@ class HumanPromptEngineer:
         elif any(w in clean_name.lower() for w in ["math", "calculus", "matrix", "eigen"]):
             persona = "applied mathematician and educator"
 
+        # Case 0: Diagram / System Design Intent (Highest priority if requested)
+        if intent["is_diagram_requested"]:
+            return cls._craft_system_design_diagram_prompt(clean_name, persona, platform_lower)
+
         # Case 1: Simple Words / ELI5 Intent
         if intent["is_simple_words"] or intent["is_practical_chat"]:
             return cls._craft_simple_words_prompt(clean_name, persona, platform_lower, intent)
@@ -108,6 +114,31 @@ class HumanPromptEngineer:
 
         # Case 4: Balanced High-Impact Universal Explanation
         return cls._craft_balanced_prompt(clean_name, persona, platform_lower)
+
+    @classmethod
+    def _craft_system_design_diagram_prompt(cls, topic: str, persona: str, platform: str) -> str:
+        """Craft prompt for exact system design architecture, component flows, and technical tradeoffs."""
+        return (
+            f"Act as a {persona}. A student has explicitly requested the EXACT SYSTEM DESIGN & ARCHITECTURE FLOW for '{topic}'.\n\n"
+            f"Please deliver an authoritative, point-by-point engineering architecture specification with:\n"
+            f"1. 🏛️ Complete System Architecture & End-to-End Pipeline (Ingestion -> Transformation -> Storage/Index -> Retrieval/Compute -> Output).\n"
+            f"2. 📦 Rigorous Component Breakdown: For every stage, specify exact data structures, models, dimensions, and latency profiles.\n"
+            f"3. 📐 Technical Blueprint Specification (You MUST include the exact structured block below):\n"
+            f"[SYSTEM_DESIGN:\n"
+            f"Title: {topic} Architecture\n"
+            f"Flow: <Component 1> -> <Component 2> -> <Component 3> -> ... -> <Output>\n"
+            f"Nodes:\n"
+            f"- <Node 1 Name> | <Role/Technology> | <Technical Parameter or Latency Note>\n"
+            f"- <Node 2 Name> | <Role/Technology> | <Technical Parameter or Latency Note>\n"
+            f"...\n"
+            f"Callouts:\n"
+            f"- <Critical bottleneck, failure mode, or latency factor>\n"
+            f"- <Production best practice or optimization rule>\n"
+            f"]\n\n"
+            f"4. ⚖️ Production Trade-Offs & Scaling Bottlenecks (Throughput, Latency, Storage, Cost).\n"
+            f"5. 🎯 Production Stack & Real-World Implementations (What modern systems actually run in production).\n\n"
+            f"Write with precision, professional engineering depth, and zero superficial fluff."
+        )
 
     @classmethod
     def _craft_simple_words_prompt(cls, topic: str, persona: str, platform: str, intent: dict) -> str:

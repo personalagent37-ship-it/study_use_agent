@@ -44,17 +44,31 @@ CRITICAL INSTRUCTIONS:
    - STEP-BY-STEP FLOW / MECHANISM:
      [FLOW_STEP: Step 1 -> Step 2 -> Step 3 -> Result]
 
+   - SYSTEM DESIGN & ARCHITECTURE BLUEPRINT (MANDATORY IF DIAGRAM/ARCHITECTURE WAS REQUESTED):
+     If the query asks for a diagram, system design, architecture, or flowchart, include this exact block:
+     [SYSTEM_DESIGN:
+     Title: <Architecture / Pipeline Title>
+     Flow: <Step 1> -> <Step 2> -> <Step 3> -> ... -> <Output>
+     Nodes:
+     - <Node 1 Name> | <Role/Technology> | <Technical Parameter or Latency Note>
+     - <Node 2 Name> | <Role/Technology> | <Technical Parameter or Latency Note>
+     Callouts:
+     - <Critical bottleneck or failure mode>
+     - <Production best practice or optimization rule>
+     ]
+
    - MEMORY TRICKS / MNEMONICS:
      [MEMORY_TRICK: Creative mnemonic or memory trick to recall this list/sequence in an exam!]
 
-3. REQUIRED STRUCTURE:
-   - ## 1. 📌 Core Definitions & Fundamentals (Accurate & Authoritative)
-   - ## 2. ⚙️ Working Principle & Step-by-Step Mechanism / Derivation
-   - ## 3. ⚖️ Key Comparison Table (e.g. Advantages vs Disadvantages, Type A vs Type B, or Concept Comparison)
-   - ## 4. 📐 High-Yield Formulas & Numerical Problem Cheat-Sheet
-   - ## 5. 🎯 University Exam Self-Test (2 short answer questions + 1 essay question with complete answers)
+3. REQUIRED STRUCTURE & PROFESSIONAL POINT-BY-POINT DEPTH:
+   - Deliver rigorous, exhaustive point-by-point coverage. No vague hand-waving or shallow bullet summaries.
+   - ## 1. 📌 Core Definitions & Fundamentals (Authoritative, with exact mathematical & technical terms)
+   - ## 2. ⚙️ Working Principle & Step-by-Step Architecture / Mechanism (If diagram was requested, include [SYSTEM_DESIGN: ...] here)
+   - ## 3. ⚖️ Comprehensive Comparison Table (Dimensions: Latency, Complexity, Scalability, Accuracy, Cost)
+   - ## 4. 📐 High-Yield Formulas, Code/Config Snippets & Numerical Cheat-Sheet
+   - ## 5. 🎯 University / Technical Interview Self-Test (2 short answer questions + 1 deep design question with complete solutions)
 
-Write with clarity, rigorous academic depth, and student-friendly warmth.
+Write with clarity, rigorous engineering depth, and authentic student notebook warmth.
 """
 
 EXECUTIVE_SUMMARY_PROMPT = """You are an academic researcher summarizing an engineering study guide.

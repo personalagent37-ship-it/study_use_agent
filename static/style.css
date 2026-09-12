@@ -1536,6 +1536,172 @@ body {
 }
 
 /* ==========================================================================
+   SYSTEM DESIGN & ARCHITECTURE BLUEPRINT (HAND-DRAWN NOTEBOOK COMPONENT)
+   ========================================================================== */
+.system-design-container {
+  margin: 24px 0;
+  padding: 16px;
+  background: #FAF9F6;
+  border: 2px dashed #94A3B8;
+  border-radius: 12px;
+  box-shadow: 0 4px 14px rgba(15, 23, 42, 0.06);
+}
+
+.system-design-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 14px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid #E2E8F0;
+}
+
+.system-design-badge {
+  font-family: var(--font-sans);
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 1.2px;
+  color: #1D4ED8;
+  text-transform: uppercase;
+  background: #EFF6FF;
+  padding: 4px 10px;
+  border-radius: 6px;
+  border: 1px solid #BFDBFE;
+}
+
+.btn-diagram-download {
+  font-family: var(--font-sans);
+  font-size: 11px;
+  font-weight: 700;
+  color: #2563EB;
+  text-decoration: none;
+  background: #FFFFFF;
+  padding: 4px 10px;
+  border-radius: 6px;
+  border: 1px solid #CBD5E1;
+  transition: all 0.2s ease;
+}
+
+.btn-diagram-download:hover {
+  background: #EFF6FF;
+  border-color: #3B82F6;
+}
+
+.system-design-canvas {
+  width: 100%;
+  overflow-x: auto;
+  display: flex;
+  justify-content: center;
+  padding: 8px 0;
+}
+
+.system-design-canvas svg {
+  max-width: 100%;
+  height: auto;
+  border-radius: 8px;
+}
+
+/* Fallback Card Blueprint Layout */
+.system-design-blueprint-card {
+  background: #FFFFFF;
+  border: 1px solid #E2E8F0;
+  border-radius: 8px;
+  padding: 18px;
+}
+
+.blueprint-title {
+  font-family: var(--font-sans);
+  font-size: 16px;
+  font-weight: 800;
+  color: #0F172A;
+  text-align: center;
+  margin-bottom: 16px;
+}
+
+.blueprint-nodes-row {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin: 16px 0;
+}
+
+.diagram-blueprint-node {
+  background: #FEF3C7;
+  border: 2px solid #1E293B;
+  border-radius: 8px;
+  padding: 10px 14px;
+  min-width: 140px;
+  text-align: center;
+  box-shadow: 2px 3px 6px rgba(0, 0, 0, 0.08);
+  font-family: var(--font-handwriting);
+}
+
+.diagram-blueprint-node:nth-child(4n+1) { background: #FEF3C7; }
+.diagram-blueprint-node:nth-child(4n+2) { background: #E0F2FE; }
+.diagram-blueprint-node:nth-child(4n+3) { background: #D1FAE5; }
+.diagram-blueprint-node:nth-child(4n+4) { background: #EDE9FE; }
+
+.node-number {
+  font-size: 10px;
+  font-weight: 800;
+  font-family: var(--font-sans);
+  color: #64748B;
+  letter-spacing: 1px;
+}
+
+.node-name {
+  font-size: 16px;
+  font-weight: 700;
+  color: #0F172A;
+}
+
+.node-role {
+  font-size: 12px;
+  font-style: italic;
+  color: #334155;
+  margin: 2px 0;
+}
+
+.node-note {
+  font-size: 11px;
+  color: #64748B;
+  margin-top: 4px;
+}
+
+.diagram-connector-arrow {
+  font-size: 20px;
+  color: #2563EB;
+  font-weight: bold;
+}
+
+.blueprint-callouts {
+  margin-top: 16px;
+  padding: 12px 16px;
+  background: #FEF9C3;
+  border: 1px solid #FDE047;
+  border-radius: 6px;
+  font-family: var(--font-handwriting);
+  font-size: 15px;
+  color: #713F12;
+}
+
+.blueprint-callouts .callout-title {
+  font-family: var(--font-sans);
+  font-size: 11px;
+  font-weight: 800;
+  color: #A16207;
+  margin-bottom: 6px;
+  text-transform: uppercase;
+}
+
+.blueprint-callouts ul {
+  margin: 0;
+  padding-left: 18px;
+}
+
+/* ==========================================================================
    HANDWRITTEN MARKDOWN TYPOGRAPHY (INSIDE RULED NOTEBOOK)
    ========================================================================== */
 .handwritten-notes-canvas {

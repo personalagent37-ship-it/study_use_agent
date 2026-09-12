@@ -9,8 +9,10 @@ from search.scraper import WebScraper
 from generators.pdf_gen import generate_notes_pdf
 from generators.docx_gen import generate_notes_docx
 from generators.pptx_gen import generate_notes_pptx
+from generators.diagram_gen import SystemDesignParser, HandDrawnDiagramGenerator
 from .router import AcademicRouter, StudyIntent, FerozRouter, FerozIntent
 from .prompts import ACADEMIC_STUDY_NOTES_PROMPT, EXECUTIVE_SUMMARY_PROMPT
+from .prompt_engineer import HumanPromptEngineer
 
 logger = logging.getLogger(__name__)
 
@@ -92,7 +94,7 @@ def sanitize_summary_output(raw_summary: str) -> str:
     cleaned = re.sub(r"^(Alright team,?|Hello students,?|Feroz here!?|Hey everyone!?)[^\n]*\n*", "", cleaned, flags=re.IGNORECASE).strip()
     return cleaned
 
-def format_web_content_as_notebook(topic: str, subject: str, raw_content: str) -> str:
+def format_web_content_as_notebook(topic: str, subject: str, raw_content: str, is_diagram_requested: bool = False) -> str:
     """Format extracted web content into the rich visual notebook structure with sticky notes and flow steps."""
     clean_topic = topic.title()
     content = raw_content.strip()
@@ -103,6 +105,21 @@ def format_web_content_as_notebook(topic: str, subject: str, raw_content: str) -
     mechanism = paras[1] if len(paras) > 1 else "The process operates through coordinated stages to achieve accurate results."
     more_details = "\n\n".join(paras[2:]) if len(paras) > 2 else ""
 
+    design_block = ""
+    if is_diagram_requested:
+        arch = SystemDesignParser.fallback_architecture_for_topic(clean_topic)
+        nodes_str = "\n".join(f"- {n.name} | {n.role} | {n.annotation}" for n in arch["nodes"])
+        callouts_str = "\n".join(f"- {c}" for c in arch["callouts"])
+        flow_str = " -> ".join(arch["flow"])
+        design_block = (
+            f"[SYSTEM_DESIGN:\n"
+            f"Title: {arch['title']}\n"
+            f"Flow: {flow_str}\n"
+            f"Nodes:\n{nodes_str}\n"
+            f"Callouts:\n{callouts_str}\n"
+            f"]\n\n"
+        )
+
     md = (
         f"# 📖 {clean_topic}\n"
         f"**Subject**: {subject}\n\n"
@@ -112,6 +129,7 @@ def format_web_content_as_notebook(topic: str, subject: str, raw_content: str) -
         f"[STICKY_REMEMBER: Key Principle: Grounding responses in external, verified context prevents hallucinations and ensures accuracy.]\n\n"
         f"## 2. ⚙️ Step-by-Step Working Mechanism\n\n"
         f"[FLOW_STEP: Input Query → Context Retrieval → Information Synthesis → Augmented Output]\n\n"
+        f"{design_block}"
         f"{mechanism}\n\n"
     )
 
@@ -298,7 +316,9 @@ class StudyAgentOrchestrator:
 
         # 1. Academic Intent & Reference Resolution
         intent: StudyIntent = AcademicRouter.parse_student_query(query, gui_model, gui_subject)
-        logger.info(f"Academic Intent Resolved: {intent.understanding_briefing}")
+        tone_intent = HumanPromptEngineer.detect_tone_and_intent(query)
+        is_diagram_requested = tone_intent.get("is_diagram_requested", False)
+        logger.info(f"Academic Intent Resolved: {intent.understanding_briefing} (Diagram Requested: {is_diagram_requested})")
 
         # 2. Research & Academic Content Retrieval (GUI Agent or Serper Scraper)
         active_gui_agent = use_gui_agent or getattr(intent, "use_gui_agent", False)
@@ -360,6 +380,11 @@ class StudyAgentOrchestrator:
             target_book=intent.target_book,
             web_context=web_context
         )
+        if is_diagram_requested:
+            notes_prompt += (
+                f"\n\nSPECIAL MANDATE: The user explicitly requested a SYSTEM DESIGN / ARCHITECTURE DIAGRAM for '{intent.cleaned_topic}'. "
+                f"Under Section 2, you MUST include the complete structured [SYSTEM_DESIGN: ...] block detailing every component node, data flow, and trade-off."
+            )
 
         raw_notes_markdown = ""
         try:
@@ -390,19 +415,22 @@ class StudyAgentOrchestrator:
                 raw_notes_markdown = format_web_content_as_notebook(
                     intent.cleaned_topic,
                     intent.subject_name,
-                    gui_res.get("content")
+                    gui_res.get("content"),
+                    is_diagram_requested=is_diagram_requested
                 )
             elif web_context:
                 raw_notes_markdown = format_web_content_as_notebook(
                     intent.cleaned_topic,
                     intent.subject_name,
-                    web_context
+                    web_context,
+                    is_diagram_requested=is_diagram_requested
                 )
             else:
                 raw_notes_markdown = format_web_content_as_notebook(
                     intent.cleaned_topic,
                     intent.subject_name,
-                    f"{intent.cleaned_topic} is an essential concept."
+                    f"{intent.cleaned_topic} is an essential concept.",
+                    is_diagram_requested=is_diagram_requested
                 )
 
         # Strictly sanitize notes output to eliminate any thinking process or preambles
@@ -412,6 +440,40 @@ class StudyAgentOrchestrator:
             subject=intent.subject_name,
             reference=intent.target_book
         )
+
+        # On-Demand System Design Diagram Generation
+        diagram_png_path = None
+        diagram_svg = None
+        if is_diagram_requested:
+            # Guarantee [SYSTEM_DESIGN: ...] exists in notes if requested
+            if "[SYSTEM_DESIGN:" not in full_notes_markdown:
+                arch = SystemDesignParser.fallback_architecture_for_topic(intent.cleaned_topic)
+                nodes_str = "\n".join(f"- {n.name} | {n.role} | {n.annotation}" for n in arch["nodes"])
+                callouts_str = "\n".join(f"- {c}" for c in arch["callouts"])
+                flow_str = " -> ".join(arch["flow"])
+                design_block = (
+                    f"\n\n[SYSTEM_DESIGN:\n"
+                    f"Title: {arch['title']}\n"
+                    f"Flow: {flow_str}\n"
+                    f"Nodes:\n{nodes_str}\n"
+                    f"Callouts:\n{callouts_str}\n"
+                    f"]\n\n"
+                )
+                if "## 2." in full_notes_markdown:
+                    parts = full_notes_markdown.split("## 2.", 1)
+                    full_notes_markdown = f"{parts[0]}## 2.{design_block}{parts[1]}"
+                else:
+                    full_notes_markdown += design_block
+
+            spec = SystemDesignParser.parse_block(full_notes_markdown) or SystemDesignParser.fallback_architecture_for_topic(intent.cleaned_topic)
+            safe_filename = re.sub(r"[^\w\-_\. ]", "_", intent.cleaned_topic).strip().replace(" ", "_")
+            diagram_png_path = self.output_dir / f"{safe_filename}_system_design.png"
+            try:
+                HandDrawnDiagramGenerator.generate_diagram_png(spec, diagram_png_path)
+                diagram_svg = HandDrawnDiagramGenerator.generate_diagram_svg(spec)
+                logger.info(f"Generated hand-drawn system design diagram assets for '{intent.cleaned_topic}'")
+            except Exception as diag_err:
+                logger.error(f"Error generating diagram assets: {diag_err}", exc_info=True)
 
         # Always append complete web AI research output if GUI browser agent was used
         if active_gui_agent and gui_res and gui_res.get("content"):
@@ -467,16 +529,17 @@ class StudyAgentOrchestrator:
         # 5. Compile Documents (PDF, PPTX, DOCX)
         safe_filename = re.sub(r"[^\w\-_\. ]", "_", intent.cleaned_topic).strip().replace(" ", "_")
         files = {}
+        active_diagram_path = diagram_png_path if (is_diagram_requested and diagram_png_path and Path(diagram_png_path).exists()) else None
 
         for fmt in requested_formats:
             try:
                 if fmt == "pdf":
                     pdf_path = self.output_dir / f"{safe_filename}_Notes.pdf"
-                    generate_notes_pdf(intent.cleaned_topic, full_notes_markdown, pdf_path)
+                    generate_notes_pdf(intent.cleaned_topic, full_notes_markdown, pdf_path, diagram_image_path=active_diagram_path)
                     files["pdf"] = f"/api/download/{pdf_path.name}"
                 elif fmt == "docx":
                     docx_path = self.output_dir / f"{safe_filename}_Notes.docx"
-                    generate_notes_docx(intent.cleaned_topic, full_notes_markdown, docx_path)
+                    generate_notes_docx(intent.cleaned_topic, full_notes_markdown, docx_path, diagram_image_path=active_diagram_path)
                     files["docx"] = f"/api/download/{docx_path.name}"
                 elif fmt == "pptx":
                     pptx_path = self.output_dir / f"{safe_filename}_Slides.pptx"
@@ -501,6 +564,9 @@ class StudyAgentOrchestrator:
             "summary": summary_text,
             "sources": sources_list if sources_list else [{"title": r.get("title", ""), "link": r.get("link", ""), "snippet": r.get("snippet", "")} for r in search_results[:4]],
             "files": files,
+            "has_diagram": bool(active_diagram_path),
+            "diagram_image": f"/api/download/{active_diagram_path.name}" if active_diagram_path else None,
+            "diagram_svg": diagram_svg if is_diagram_requested else None,
             "color": book_color,
             "created_at": datetime.now().strftime("%B %d, %Y • %I:%M %p")
         }
