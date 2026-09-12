@@ -16,6 +16,7 @@ from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.chrome.service import Service
 from selenium.webdriver.common.by import By
 from selenium.webdriver.common.keys import Keys
+from selenium.webdriver.common.action_chains import ActionChains
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 
@@ -105,93 +106,247 @@ class HumanGUIAgent:
 
         return self.driver
 
-    def insert_full_prompt(self, element, text: str):
-        """Insert the complete multi-line prompt in ONE GO without triggering premature submits on newlines."""
+    def _inject_human_cursor(self):
+        """Inject an animated, glowing red mouse pointer into the page so the student can visibly see the agent's cursor gliding across the interface."""
         try:
-            # Atomic JavaScript insertion for rich-textareas (Gemini & Claude)
+            self.driver.execute_script("""
+                if (!document.getElementById('alexandria-human-cursor')) {
+                    const cursor = document.createElement('div');
+                    cursor.id = 'alexandria-human-cursor';
+                    cursor.style.position = 'fixed';
+                    cursor.style.width = '20px';
+                    cursor.style.height = '20px';
+                    cursor.style.borderRadius = '50%';
+                    cursor.style.backgroundColor = 'rgba(239, 68, 68, 0.9)';
+                    cursor.style.border = '2px solid white';
+                    cursor.style.boxShadow = '0 0 12px rgba(239, 68, 68, 0.8), 0 2px 4px rgba(0,0,0,0.3)';
+                    cursor.style.pointerEvents = 'none';
+                    cursor.style.zIndex = '2147483647';
+                    cursor.style.transition = 'all 0.35s cubic-bezier(0.25, 1, 0.5, 1)';
+                    cursor.style.transform = 'translate(-50%, -50%) scale(1)';
+                    cursor.style.top = '120px';
+                    cursor.style.left = '120px';
+                    document.body.appendChild(cursor);
+                }
+            """)
+        except Exception:
+            pass
+
+    def human_move_mouse(self, element):
+        """Visually glide the mouse pointer to the element and perform ActionChains move."""
+        self._inject_human_cursor()
+        try:
             self.driver.execute_script("""
                 const el = arguments[0];
-                const text = arguments[1];
-                el.focus();
-                // Select all inside contenteditable
-                const sel = window.getSelection();
-                const range = document.createRange();
-                range.selectNodeContents(el);
-                sel.removeAllRanges();
-                sel.addRange(range);
-                // Insert text atomically
-                const ok = document.execCommand('insertText', false, text);
-                if (!ok) {
-                    el.innerText = text;
+                const cursor = document.getElementById('alexandria-human-cursor');
+                if (el && cursor) {
+                    const rect = el.getBoundingClientRect();
+                    const targetX = Math.max(10, rect.left + (rect.width / 2));
+                    const targetY = Math.max(10, rect.top + (rect.height / 2));
+                    cursor.style.left = targetX + 'px';
+                    cursor.style.top = targetY + 'px';
+                    cursor.style.transform = 'translate(-50%, -50%) scale(1.2)';
+                    setTimeout(() => {
+                        cursor.style.transform = 'translate(-50%, -50%) scale(1)';
+                    }, 300);
                 }
-                el.dispatchEvent(new Event('input', { bubbles: true }));
-                el.dispatchEvent(new Event('change', { bubbles: true }));
-            """, element, text)
-            time.sleep(0.6)
-        except Exception as js_err:
-            logger.warning(f"JS prompt insertion fallback: {js_err}")
-            # Fallback: type lines with Shift+Enter so Enter never submits prematurely
-            lines = text.split("\n")
-            for idx, line in enumerate(lines):
-                if line:
-                    element.send_keys(line)
-                if idx < len(lines) - 1:
-                    element.send_keys(Keys.SHIFT, Keys.ENTER)
-                time.sleep(0.02)
+            """, element)
+        except Exception:
+            pass
 
-    def human_typing(self, element, text: str, delay_range: tuple = (0.02, 0.06)):
-        """Simulate human-like keystroke intervals."""
-        for char in text:
-            element.send_keys(char)
-            time.sleep(random.uniform(*delay_range))
+        try:
+            ActionChains(self.driver).move_to_element(element).pause(random.uniform(0.15, 0.35)).perform()
+        except Exception:
+            pass
+
+    def human_move_and_click(self, element):
+        """Move mouse realistically to element, pause, flash click ripple, and click."""
+        self.human_move_mouse(element)
+        time.sleep(random.uniform(0.2, 0.4))
+        try:
+            self.driver.execute_script("""
+                const cursor = document.getElementById('alexandria-human-cursor');
+                if (cursor) {
+                    cursor.style.transform = 'translate(-50%, -50%) scale(0.7)';
+                    cursor.style.backgroundColor = 'rgba(34, 197, 94, 0.95)';
+                    setTimeout(() => {
+                        cursor.style.transform = 'translate(-50%, -50%) scale(1)';
+                        cursor.style.backgroundColor = 'rgba(239, 68, 68, 0.9)';
+                    }, 220);
+                }
+            """)
+        except Exception:
+            pass
+
+        try:
+            ActionChains(self.driver).click(element).perform()
+        except Exception:
+            try:
+                element.click()
+            except Exception:
+                self.driver.execute_script("arguments[0].click();", element)
+
+    def human_typing(self, element, text: str, max_duration: float = 5.5):
+        """
+        Simulate fast, authentic human keystrokes with visible typing animation.
+        CRITICAL: All newlines (\n) are entered with Shift+Enter so they NEVER trigger early form submission.
+        The entire prompt is entered cleanly as ONE single atomic prompt.
+        """
+        lines = text.split("\n")
+        total_chars = max(len(text), 1)
+        # Calculate delay per char so typing completes in 3-6 seconds
+        delay = max(0.003, min(0.025, max_duration / total_chars))
+
+        for line_idx, line in enumerate(lines):
+            # Fast touch-typing in natural chunks
+            chunk_size = 1 if len(line) < 80 else 3
+            for i in range(0, len(line), chunk_size):
+                chunk = line[i:i + chunk_size]
+                try:
+                    element.send_keys(chunk)
+                except Exception:
+                    element = self.driver.switch_to.active_element
+                    element.send_keys(chunk)
+                time.sleep(delay * len(chunk))
+
+            # Newline without submitting! Shift+Enter creates line break
+            if line_idx < len(lines) - 1:
+                try:
+                    element.send_keys(Keys.SHIFT, Keys.ENTER)
+                except Exception:
+                    element = self.driver.switch_to.active_element
+                    element.send_keys(Keys.SHIFT, Keys.ENTER)
+                time.sleep(0.04)
+
+        time.sleep(0.4)
+
+    def insert_full_prompt(self, element, text: str):
+        """Fast fallback prompt insertion if needed."""
+        self.human_typing(element, text, max_duration=4.5)
 
     # --------------------------------------------------------------------------
-    # 1. PERPLEXITY WEB OPERATOR (Instant, No Login Needed)
+    # 1. PERPLEXITY WEB OPERATOR (Human Mouse + Typing)
     # --------------------------------------------------------------------------
     def research_perplexity(self, query: str) -> Dict[str, Any]:
-        """Perform web-grounded research on Perplexity AI web interface."""
+        """Perform web-grounded research on Perplexity AI web interface like a human student."""
         driver = self.get_driver()
-        clean_q = query.replace(" ", "+")
-        url = f"https://www.perplexity.ai/search?q={clean_q}"
+        url = "https://www.perplexity.ai"
         logger.info(f"[GUI Agent • Perplexity] Navigating to {url}...")
         driver.get(url)
+        time.sleep(3)
 
-        time.sleep(4)
         extracted_text = ""
         sources = []
 
         try:
-            # Check for Cloudflare Turnstile / verification
-            body_text = driver.find_element(By.TAG_NAME, "body").text
-            if "security verification" in body_text.lower() or "just a moment..." in driver.title.lower():
-                logger.info("[GUI Agent • Perplexity] Cloudflare verification detected. Waiting 5s...")
-                time.sleep(5)
-                body_text = driver.find_element(By.TAG_NAME, "body").text
-                if "security verification" in body_text.lower() or "just a moment..." in driver.title.lower():
-                    logger.warning("[GUI Agent • Perplexity] Cloudflare challenge active. Seamlessly retrieving via Google Search...")
-                    return self.research_google(query)
+            self._inject_human_cursor()
 
-            answer_elements = driver.find_elements(By.CSS_SELECTOR, "div.prose, [data-testid='answer'], div[class*='answer']")
-            if answer_elements:
-                for el in answer_elements:
-                    txt = el.text.strip()
-                    if len(txt) > len(extracted_text):
-                        extracted_text = txt
+            # Press Escape to clear any overlay modals
+            try:
+                driver.find_element(By.TAG_NAME, "body").send_keys(Keys.ESCAPE)
+                time.sleep(0.3)
+            except Exception:
+                pass
+
+            # 1. Dismiss cookie banners if present
+            cookie_btns = driver.find_elements(By.XPATH, "//button[contains(., 'Got it') or contains(., 'Accept') or contains(., 'Decline optional')]")
+            if cookie_btns:
+                try:
+                    self.human_move_and_click(cookie_btns[0])
+                    time.sleep(0.5)
+                except Exception:
+                    pass
+
+            # 2. Dismiss sign-in popup if present
+            close_btns = driver.find_elements(By.CSS_SELECTOR, "button[aria-label*='Close'], button[aria-label*='close']")
+            if close_btns:
+                try:
+                    self.human_move_and_click(close_btns[0])
+                    time.sleep(0.4)
+                except Exception:
+                    pass
+
+            # 3. Locate search input
+            wait = WebDriverWait(driver, 8)
+            input_box = None
+            for sel in ["#ask-input", "textarea[placeholder*='Ask']", "div[contenteditable='true']", "textarea"]:
+                matching = driver.find_elements(By.CSS_SELECTOR, sel)
+                if matching and matching[0].is_displayed():
+                    input_box = matching[0]
+                    break
+
+            if not input_box:
+                input_box = wait.until(EC.presence_of_element_located((By.CSS_SELECTOR, "#ask-input, div[contenteditable='true'], textarea")))
+
+            # Move mouse to search box and click
+            logger.info("[GUI Agent • Perplexity] Moving mouse to search bar...")
+            self.human_move_and_click(input_box)
+            time.sleep(0.4)
+
+            # Human typing into search box
+            logger.info(f"[GUI Agent • Perplexity] Human typing query ({len(query)} chars)...")
+            self.human_typing(input_box, query, max_duration=4.5)
+            time.sleep(0.5)
+
+            # 4. Find submit button or press ENTER
+            submit_btn = None
+            submit_candidates = driver.find_elements(By.CSS_SELECTOR, "button[aria-label*='Submit'], button[aria-label*='Search'], button[aria-label*='Send'], form button")
+            for b in submit_candidates:
+                if b.is_displayed():
+                    submit_btn = b
+                    break
+
+            if submit_btn:
+                logger.info("[GUI Agent • Perplexity] Moving mouse to submit button...")
+                self.human_move_and_click(submit_btn)
+            else:
+                input_box.send_keys(Keys.ENTER)
+
+            logger.info("[GUI Agent • Perplexity] Query submitted. Waiting for answer stream...")
+            time.sleep(5)
+
+            # 5. Extract streaming answer
+            prev_len = 0
+            stable_count = 0
+            for _ in range(35):
+                # Check for sign-in wall
+                body_txt = driver.find_element(By.TAG_NAME, "body").text
+                if "Sign in to continue using Perplexity" in body_txt and "Answer" not in body_txt:
+                    logger.warning("[GUI Agent • Perplexity] Perplexity guest quota hit or login wall shown.")
+                    break
+
+                answer_elements = driver.find_elements(By.CSS_SELECTOR, "div.prose, [data-testid='answer'], div[class*='answer']")
+                if answer_elements:
+                    for el in answer_elements:
+                        txt = el.text.strip()
+                        if len(txt) > len(extracted_text):
+                            extracted_text = txt
+
+                if extracted_text and len(extracted_text) == prev_len and len(extracted_text) > 80:
+                    stable_count += 1
+                    if stable_count >= 3:
+                        break
+                else:
+                    prev_len = len(extracted_text)
+                    stable_count = 0
+
+                time.sleep(1)
+
+            # Extract source links
+            links = driver.find_elements(By.CSS_SELECTOR, "a[href^='http']")
+            for a in links[:8]:
+                try:
+                    href = a.get_attribute("href")
+                    if href and not any(skip in href for skip in ["perplexity.ai", "google", "login", "account"]):
+                        title = a.text.strip() or "Perplexity Reference"
+                        if not any(s["link"] == href for s in sources):
+                            sources.append({"title": title[:70], "link": href})
+                except Exception:
+                    continue
 
             if not extracted_text:
-                lines = [l.strip() for l in body_text.split("\n") if l.strip()]
-                if "Answer" in lines:
-                    idx = lines.index("Answer")
-                    extracted_text = "\n\n".join(lines[idx+1:idx+25])
-                else:
-                    extracted_text = "\n\n".join(lines[:30])
-
-            links = driver.find_elements(By.CSS_SELECTOR, "a[href^='http']")
-            for a in links[:6]:
-                href = a.get_attribute("href")
-                if href and not any(skip in href for skip in ["perplexity.ai", "google", "login"]):
-                    title = a.text.strip() or "Academic Reference"
-                    sources.append({"title": title, "link": href})
+                logger.warning("[GUI Agent • Perplexity] Insufficient output from Perplexity. Seamlessly retrieving via Google Search AI Overview...")
+                return self.research_google(query)
 
             logger.info(f"[GUI Agent • Perplexity] Extracted {len(extracted_text)} chars of grounded research.")
             return {
@@ -199,22 +354,17 @@ class HumanGUIAgent:
                 "success": bool(extracted_text),
                 "content": extracted_text,
                 "sources": sources,
-                "url": url
+                "url": driver.current_url
             }
         except Exception as e:
-            logger.error(f"[GUI Agent • Perplexity] Extraction error: {e}")
-            return {
-                "source": "Perplexity AI Web",
-                "success": False,
-                "content": "",
-                "error": str(e)
-            }
+            logger.error(f"[GUI Agent • Perplexity] Error: {e}. Seamlessly falling back to Google Search...")
+            return self.research_google(query)
 
     # --------------------------------------------------------------------------
-    # 2. CLAUDE AI WEB OPERATOR
+    # 2. CLAUDE AI WEB OPERATOR (Human Mouse + Typing)
     # --------------------------------------------------------------------------
     def research_claude(self, prompt: str) -> Dict[str, Any]:
-        """Interact with Claude AI web interface (claude.ai/new)."""
+        """Interact with Claude AI web interface (claude.ai/new) with mouse actions and human typing."""
         driver = self.get_driver()
         url = "https://claude.ai/new"
         logger.info(f"[GUI Agent • Claude AI] Navigating to {url}...")
@@ -223,36 +373,62 @@ class HumanGUIAgent:
 
         current_url = driver.current_url
         if "login" in current_url:
-            logger.warning("[GUI Agent • Claude AI] Session not logged in. Waiting for user login...")
-            return {
-                "source": "Claude AI Web",
-                "success": False,
-                "needs_login": True,
-                "message": "Claude AI requires a one-time login. Please log in in the opened Chrome window.",
-                "url": current_url
-            }
+            logger.warning("[GUI Agent • Claude AI] Session not logged in. Waiting for student login in Chrome...")
+            # If not headless, give user 20 seconds to log in in the opened Chrome window
+            if not self.headless:
+                for sec in range(20):
+                    time.sleep(1)
+                    try:
+                        if "login" not in driver.current_url:
+                            logger.info("[GUI Agent • Claude AI] Student login detected! Proceeding...")
+                            break
+                    except Exception:
+                        pass
+
+            if "login" in driver.current_url:
+                return {
+                    "source": "Claude AI Web",
+                    "success": False,
+                    "needs_login": True,
+                    "message": "Claude AI requires a one-time login. Please log in in the opened Chrome window (session is saved).",
+                    "url": current_url
+                }
 
         try:
+            self._inject_human_cursor()
             wait = WebDriverWait(driver, 10)
             input_box = wait.until(
                 EC.presence_of_element_located((
                     By.CSS_SELECTOR,
-                    "div[contenteditable='true'], fieldset div[contenteditable='true'], textarea"
+                    "div[contenteditable='true'], fieldset div[contenteditable='true'], div.ProseMirror, textarea"
                 ))
             )
-            input_box.click()
+
+            # Move mouse to input box and click
+            logger.info("[GUI Agent • Claude AI] Moving mouse to chat input...")
+            self.human_move_and_click(input_box)
+            time.sleep(0.4)
+
+            # Type with human keystrokes (Shift+Enter for newlines so prompt is submitted as ONE single message)
+            logger.info(f"[GUI Agent • Claude AI] Human typing prompt ({len(prompt)} chars)...")
+            self.human_typing(input_box, prompt, max_duration=5.0)
             time.sleep(0.5)
 
-            self.insert_full_prompt(input_box, prompt)
-            time.sleep(1.0)
+            # Move mouse to Send button and click
+            send_btns = driver.find_elements(By.CSS_SELECTOR, "button[aria-label*='Send'], button[class*='send'], button:has(svg)")
+            send_btn = None
+            for b in send_btns:
+                if b.is_displayed() and b.is_enabled():
+                    send_btn = b
+                    break
 
-            send_btns = driver.find_elements(By.CSS_SELECTOR, "button[aria-label*='Send'], button[class*='send']")
-            if send_btns and send_btns[0].is_enabled():
-                send_btns[0].click()
+            if send_btn:
+                logger.info("[GUI Agent • Claude AI] Moving mouse to Send button...")
+                self.human_move_and_click(send_btn)
             else:
                 input_box.send_keys(Keys.ENTER)
 
-            logger.info("[GUI Agent • Claude AI] Prompt submitted. Waiting for response stream...")
+            logger.info("[GUI Agent • Claude AI] Prompt submitted in ONE go. Waiting for response stream...")
             time.sleep(5)
 
             prev_length = 0
@@ -294,10 +470,10 @@ class HumanGUIAgent:
             }
 
     # --------------------------------------------------------------------------
-    # 3. GEMINI WEB OPERATOR
+    # 3. GEMINI WEB OPERATOR (Human Mouse + Typing in ONE Prompt)
     # --------------------------------------------------------------------------
     def research_gemini(self, prompt: str) -> Dict[str, Any]:
-        """Interact with Google Gemini web interface (gemini.google.com/app)."""
+        """Interact with Google Gemini web interface (gemini.google.com/app) with mouse and human typing."""
         driver = self.get_driver()
         url = "https://gemini.google.com/app"
         logger.info(f"[GUI Agent • Gemini Web] Navigating to {url}...")
@@ -315,6 +491,7 @@ class HumanGUIAgent:
             }
 
         try:
+            self._inject_human_cursor()
             wait = WebDriverWait(driver, 10)
             input_box = wait.until(
                 EC.presence_of_element_located((
@@ -322,19 +499,32 @@ class HumanGUIAgent:
                     "rich-textarea div[contenteditable='true'], div[role='textbox']"
                 ))
             )
-            input_box.click()
-            time.sleep(0.5)
 
-            self.insert_full_prompt(input_box, prompt)
-            time.sleep(1.0)
+            # Move mouse to input box and click
+            logger.info("[GUI Agent • Gemini Web] Moving mouse to chat input box...")
+            self.human_move_and_click(input_box)
+            time.sleep(0.4)
 
+            # Human typing with Shift+Enter for newlines: stays in ONE single prompt!
+            logger.info(f"[GUI Agent • Gemini Web] Human typing prompt ({len(prompt)} chars)...")
+            self.human_typing(input_box, prompt, max_duration=5.0)
+            time.sleep(0.6)
+
+            # Move mouse to Send button and click
             send_btns = driver.find_elements(By.CSS_SELECTOR, "button[aria-label*='Send'], button.send-button")
-            if send_btns and send_btns[0].is_enabled():
-                send_btns[0].click()
+            send_btn = None
+            for b in send_btns:
+                if b.is_displayed() and b.is_enabled():
+                    send_btn = b
+                    break
+
+            if send_btn:
+                logger.info("[GUI Agent • Gemini Web] Moving mouse to Send button...")
+                self.human_move_and_click(send_btn)
             else:
                 input_box.send_keys(Keys.ENTER)
 
-            logger.info("[GUI Agent • Gemini Web] Prompt submitted. Waiting for response...")
+            logger.info("[GUI Agent • Gemini Web] Prompt submitted in ONE go. Waiting for response...")
             time.sleep(5)
 
             extracted_text = ""
@@ -500,9 +690,14 @@ class HumanGUIAgent:
         elif "claude" in target_lower:
             res = self.research_claude(query_prompt)
             if res.get("needs_login") or not res.get("success"):
-                logger.warning("Claude Web requires login. Auto-routing to Perplexity Web for instant research...")
+                logger.warning("Claude Web requires login. Auto-routing to Gemini Web & Perplexity for research...")
+                # First try Gemini Web (already logged in and authenticated)
+                g_res = self.research_gemini(query_prompt)
+                if g_res.get("success") and g_res.get("content"):
+                    g_res["warning"] = "Claude AI requires a one-time sign-in in Chrome. Retrieved authoritative content via Gemini Web."
+                    return g_res
                 fallback = self.research_perplexity(query_prompt)
-                fallback["warning"] = "Claude AI requires login in Chrome. Automatically retrieved authoritative content via Perplexity Web."
+                fallback["warning"] = "Claude AI requires a one-time sign-in in Chrome. Retrieved authoritative content via Web Agent."
                 return fallback
             return res
 
@@ -511,7 +706,7 @@ class HumanGUIAgent:
             if res.get("needs_login") or not res.get("success"):
                 logger.warning("Gemini Web requires Google login. Auto-routing to Perplexity Web...")
                 fallback = self.research_perplexity(query_prompt)
-                fallback["warning"] = "Google Gemini requires login in Chrome. Automatically retrieved authoritative content via Perplexity Web."
+                fallback["warning"] = "Google Gemini requires login in Chrome. Automatically retrieved authoritative content via Web Agent."
                 return fallback
             return res
 
@@ -519,7 +714,14 @@ class HumanGUIAgent:
             return self.research_google(topic)
 
         else:
-            return self.research_perplexity(query_prompt)
+            res = self.research_perplexity(query_prompt)
+            if not res.get("success") or not res.get("content"):
+                logger.warning("Perplexity search returned empty or blocked. Seamlessly routing to Gemini Web & Google...")
+                g_res = self.research_gemini(query_prompt)
+                if g_res.get("success") and g_res.get("content"):
+                    return g_res
+                return self.research_google(topic)
+            return res
 
     def close(self):
         """Safely shut down the browser session."""
