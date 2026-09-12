@@ -1,0 +1,675 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Alexandria Studio • AI Academic & Engineering Study Studio</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <!-- Google Fonts: Handwriting & Academic Typography -->
+  <link href="https://fonts.googleapis.com/css2?family=Caveat:wght@600;700&family=Cinzel:wght@600;700;800&family=Fira+Code:wght@400;600&family=Inter:wght@300;400;500;600;700&family=Kalam:wght@400;700&family=Patrick+Hand&family=Merriweather:ital,wght@0,300;0,400;0,700;1,300&display=swap" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+  <!-- KaTeX for crisp mathematical formulas -->
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/katex.min.css">
+  <script src="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/katex.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/contrib/auto-render.min.js"></script>
+  <link rel="stylesheet" href="/static/style.css?v=6.0">
+</head>
+<body>
+  <!-- Ambient Particle Canvas -->
+  <canvas id="ambient-canvas"></canvas>
+
+  <div class="library-viewport">
+    
+    <!-- Top Header -->
+    <header class="studio-header">
+      <div class="brand">
+        <div class="brand-icon">🏛️</div>
+        <div class="brand-text">
+          <h1>ALEXANDRIA STUDIO</h1>
+          <span class="tagline">AI Academic & Engineering Study Studio • Comprehensive Notes & Derivations</span>
+        </div>
+      </div>
+      <div class="header-curriculum-badge">
+        <span class="badge-dot"></span>
+        <span>Textbook & Academic Research Grounded</span>
+      </div>
+    </header>
+
+    <!-- Main Study Desk -->
+    <main class="study-stage">
+      
+      <!-- Central Study Desk Input -->
+      <section class="study-desk-card">
+        <div class="desk-glow"></div>
+        <div class="desk-content">
+          
+          <div class="prompt-header">
+            <h2>Select Subject or Search Any Topic</h2>
+            <p>Pre-grounded in standard academic textbooks: <em>Stuart Russell, B.S. Grewal, Halliday & Resnick, Tanenbaum, Boylestad, Kreyszig</em>.</p>
+          </div>
+
+          <!-- Universal Academic Subject Quick Chips -->
+          <div class="subject-chips-bar">
+            <button type="button" class="subject-chip active" data-subject="AUTO" data-book="Authoritative Academic & University References">
+              <span class="chip-icon">🌐</span>
+              <span class="chip-name">Auto-Detect / General</span>
+            </button>
+            <button type="button" class="subject-chip" data-subject="CS_AI" data-book="Stuart Russell, Peter Norvig & Gary Bradski">
+              <span class="chip-icon">💻</span>
+              <span class="chip-name">Computer Science & AI</span>
+            </button>
+            <button type="button" class="subject-chip" data-subject="MATHS" data-book="B.S. Grewal & Erwin Kreyszig">
+              <span class="chip-icon">📐</span>
+              <span class="chip-name">Mathematics</span>
+            </button>
+            <button type="button" class="subject-chip" data-subject="PHYSICS" data-book="David Halliday & Robert Resnick">
+              <span class="chip-icon">⚛️</span>
+              <span class="chip-name">Applied Physics</span>
+            </button>
+            <button type="button" class="subject-chip" data-subject="ELECTRICAL" data-book="Boylestad, Nashelsky & Theraja">
+              <span class="chip-icon">⚡</span>
+              <span class="chip-name">Electrical & Electronics</span>
+            </button>
+            <button type="button" class="subject-chip" data-subject="MECHANICAL" data-book="Beer & Johnston / N.D. Bhatt">
+              <span class="chip-icon">⚙️</span>
+              <span class="chip-name">Mechanical & Civil</span>
+            </button>
+            <button type="button" class="subject-chip chip-custom" id="btn-custom-subject" data-subject="CUSTOM">
+              <span class="chip-icon">✏️</span>
+              <span class="chip-name" id="custom-subject-label">Custom Subject...</span>
+            </button>
+          </div>
+
+          <!-- Active Textbook Badge -->
+          <div class="textbook-indicator">
+            <span class="tb-label">📖 Target Reference:</span>
+            <span id="active-textbook-name" class="tb-name">Authoritative Academic & University References (Auto-Detect)</span>
+          </div>
+
+          <form id="generate-form" class="prompt-form">
+            <!-- Dynamic Token Limit Warning Banner (Appears when model quota is over limit) -->
+            <div id="token-over-limit-alert" class="token-over-limit-alert hidden">
+              <div class="alert-icon">⚠️</div>
+              <div class="alert-content">
+                <span class="alert-title">Model Token Limit Exceeded!</span>
+                <span class="alert-desc" id="token-alert-desc">Current model has exhausted its token allowance (Error 402). Switch to Free Engine.</span>
+              </div>
+              <div class="alert-actions">
+                <button type="button" class="btn-alert-switch" id="btn-alert-switch-free">⚡ Switch to Free Engine</button>
+                <button type="button" class="btn-alert-usage" id="btn-alert-view-usage">📊 View Usage</button>
+                <button type="button" class="btn-alert-dismiss" id="btn-alert-dismiss">✕</button>
+              </div>
+            </div>
+
+            <div class="input-wrapper">
+              <span class="input-icon">✏️</span>
+              <input 
+                type="text" 
+                id="topic-input" 
+                placeholder="e.g. 'What is OpenCV and its core functions' or 'Eigenvalues & Diagonalization' or 'Use Claude: RAG Architecture'..." 
+                required 
+                autocomplete="off"
+              />
+              <button type="submit" id="generate-btn" class="btn-generate">
+                <span class="btn-sparkle">✨</span>
+                <span class="btn-text">Generate Notes</span>
+              </button>
+            </div>
+
+            <!-- Chat Control Bar (Directly Under the Chat Input) -->
+            <div class="chat-controls-bar">
+              
+              <!-- Floating Model Selector Dropdown matching User Screenshot media_1789174850100.png -->
+              <div class="model-picker-wrapper" id="model-picker-wrapper">
+                <button type="button" class="model-trigger-btn" id="model-trigger-btn" title="Click to choose AI Model">
+                  <span class="trigger-bolt">⚡</span>
+                  <span class="trigger-name" id="selected-model-name">Gemini 3.8 Flash</span>
+                  <span class="trigger-chevron">▾</span>
+                </button>
+
+                <!-- Floating Dropdown Menu (compact matching user screenshot) -->
+                <div class="model-dropdown-menu hidden" id="model-dropdown-menu">
+                  <div class="menu-header">
+                    <span class="menu-header-title">Model</span>
+                  </div>
+
+                  <div class="menu-items" id="model-menu-list">
+                    <!-- 1. Gemini 3.8 Flash -->
+                    <div class="menu-item active" data-model="google/gemini-3.8-flash" data-name="Gemini 3.8 Flash" data-quota="available">
+                      <div class="item-left">
+                        <span class="item-name">Gemini 3.8 Flash</span>
+                        <span class="item-meta">High</span>
+                        <span class="item-pill fast">Fast <span class="info-mark">ⓘ</span></span>
+                      </div>
+                      <div class="item-right">
+                        <span class="item-check">✓</span>
+                      </div>
+                    </div>
+
+                    <!-- 2. Gemini 3.7 Flash -->
+                    <div class="menu-item" data-model="google/gemini-3.7-flash" data-name="Gemini 3.7 Flash" data-quota="available">
+                      <div class="item-left">
+                        <span class="item-name">Gemini 3.7 Flash</span>
+                        <span class="item-meta">Medium</span>
+                        <span class="item-pill fast">Fast <span class="info-mark">ⓘ</span></span>
+                      </div>
+                      <div class="item-right">
+                        <span class="item-arrow">›</span>
+                      </div>
+                    </div>
+
+                    <!-- 3. Gemini 3.6 Flash -->
+                    <div class="menu-item" data-model="google/gemini-3.6-flash" data-name="Gemini 3.6 Flash" data-quota="available">
+                      <div class="item-left">
+                        <span class="item-name">Gemini 3.6 Flash</span>
+                        <span class="item-meta">Medium</span>
+                        <span class="item-pill fast">Fast <span class="info-mark">ⓘ</span></span>
+                      </div>
+                      <div class="item-right">
+                        <span class="item-arrow">›</span>
+                      </div>
+                    </div>
+
+                    <!-- 4. Gemini 3.1 Pro -->
+                    <div class="menu-item" data-model="google/gemini-3.1-pro-preview" data-name="Gemini 3.1 Pro" data-quota="available">
+                      <div class="item-left">
+                        <span class="item-name">Gemini 3.1 Pro</span>
+                        <span class="item-meta">Low</span>
+                      </div>
+                      <div class="item-right">
+                        <span class="item-arrow">›</span>
+                      </div>
+                    </div>
+
+                    <!-- 5. Gemini 2.5 Flash -->
+                    <div class="menu-item" data-model="google/gemini-2.5-flash" data-name="Gemini 2.5 Flash" data-quota="available">
+                      <div class="item-left">
+                        <span class="item-name">Gemini 2.5 Flash</span>
+                        <span class="item-meta">High</span>
+                        <span class="item-pill fast">Fast <span class="info-mark">ⓘ</span></span>
+                      </div>
+                      <div class="item-right">
+                        <span class="item-arrow">›</span>
+                      </div>
+                    </div>
+
+                    <!-- 6. Claude Sonnet 4.6 (Thinking) -->
+                    <div class="menu-item" data-model="anthropic/claude-sonnet-4.6" data-name="Claude Sonnet 4.6 (Thinking)" data-quota="completed">
+                      <div class="item-left">
+                        <span class="item-name">Claude Sonnet 4.6</span>
+                        <span class="item-quota-badge error">Quota Completed</span>
+                      </div>
+                      <div class="item-right">
+                        <span class="item-arrow">›</span>
+                      </div>
+                    </div>
+
+                    <!-- 7. Claude Opus 4.6 (Thinking) -->
+                    <div class="menu-item" data-model="anthropic/claude-opus-4.6" data-name="Claude Opus 4.6 (Thinking)" data-quota="completed">
+                      <div class="item-left">
+                        <span class="item-name">Claude Opus 4.6</span>
+                        <span class="item-quota-badge error">Quota Completed</span>
+                      </div>
+                      <div class="item-right">
+                        <span class="item-arrow">›</span>
+                      </div>
+                    </div>
+
+                    <!-- 8. GPT-OSS 120B (Medium) -->
+                    <div class="menu-item" data-model="openai/gpt-oss-120b" data-name="GPT-OSS 120B (Medium)" data-quota="completed">
+                      <div class="item-left">
+                        <span class="item-name">GPT-OSS 120B</span>
+                        <span class="item-quota-badge error">Quota Completed</span>
+                      </div>
+                      <div class="item-right">
+                        <span class="item-arrow">›</span>
+                      </div>
+                    </div>
+
+                    <!-- 9. GPT-4o mini -->
+                    <div class="menu-item" data-model="openai/gpt-4o-mini" data-name="GPT-4o mini" data-quota="available">
+                      <div class="item-left">
+                        <span class="item-name">GPT-4o-mini</span>
+                        <span class="item-meta">Fast</span>
+                      </div>
+                      <div class="item-right">
+                        <span class="item-arrow">›</span>
+                      </div>
+                    </div>
+
+                    <!-- 10. Perplexity Sonar -->
+                    <div class="menu-item" data-model="perplexity/sonar" data-name="Perplexity Sonar" data-quota="available">
+                      <div class="item-left">
+                        <span class="item-name">Perplexity Sonar</span>
+                        <span class="item-meta">Web</span>
+                      </div>
+                      <div class="item-right">
+                        <span class="item-arrow">›</span>
+                      </div>
+                    </div>
+
+                    <!-- 11. Nex AGI Mini Free (High Speed) -->
+                    <div class="menu-item" data-model="nex-agi/nex-n2.5-mini:free" data-name="Nex AGI Mini (Free)" data-quota="available">
+                      <div class="item-left">
+                        <span class="item-name">Nex AGI Mini</span>
+                        <span class="item-quota-badge free">100% Free • Fast</span>
+                      </div>
+                      <div class="item-right">
+                        <span class="item-arrow">›</span>
+                      </div>
+                    </div>
+
+                    <!-- 12. Nemotron 3.5 Free -->
+                    <div class="menu-item" data-model="nvidia/nemotron-3.5-lightning:free" data-name="Nemotron 3.5 (Free)" data-quota="available">
+                      <div class="item-left">
+                        <span class="item-name">Nemotron 3.5</span>
+                        <span class="item-quota-badge free">100% Free</span>
+                      </div>
+                      <div class="item-right">
+                        <span class="item-arrow">›</span>
+                      </div>
+                    </div>
+
+                    <div class="menu-divider"></div>
+
+                    <!-- Row 12: View Usage -->
+                    <div class="menu-item menu-usage-item" id="btn-view-usage" title="View live token limits and consumption">
+                      <div class="item-left">
+                        <span class="usage-icon">⚡</span>
+                        <span class="item-name">View Usage</span>
+                      </div>
+                      <div class="item-right">
+                        <span class="item-arrow">›</span>
+                      </div>
+                    </div>
+
+                  </div>
+                </div>
+              </div>
+
+              <!-- Export Formats Selection -->
+              <div class="formats-bar">
+                <span class="format-label">Formats:</span>
+                <div class="format-chips">
+                  <label class="chip active">
+                    <input type="checkbox" name="format" value="handwritten" checked>
+                    <span class="chip-badge note">📖</span>
+                    <span class="chip-desc">Handwritten Sheet</span>
+                  </label>
+                  <label class="chip active">
+                    <input type="checkbox" name="format" value="pdf" checked>
+                    <span class="chip-badge pdf">📕</span>
+                    <span class="chip-desc">PDF Guide</span>
+                  </label>
+                  <label class="chip active">
+                    <input type="checkbox" name="format" value="pptx" checked>
+                    <span class="chip-badge pptx">📊</span>
+                    <span class="chip-desc">PPTX</span>
+                  </label>
+                  <label class="chip active">
+                    <input type="checkbox" name="format" value="docx" checked>
+                    <span class="chip-badge docx">📝</span>
+                    <span class="chip-desc">DOCX</span>
+                  </label>
+                </div>
+              </div>
+
+            </div>
+          </form>
+
+          <!-- Live Understanding Briefing Card -->
+          <div id="briefing-card" class="briefing-card hidden">
+            <div class="briefing-header">
+              <span class="briefing-badge">🎯 ACADEMIC BRIEFING</span>
+            </div>
+            <p id="briefing-text" class="briefing-text">Analyzing academic references and key concepts...</p>
+          </div>
+
+          <!-- Live Research Animation Stepper -->
+          <div id="research-stepper" class="research-stepper hidden">
+            <div class="stepper-track">
+              <div class="step-node active" id="step-search">
+                <div class="node-circle">🔍</div>
+                <div class="node-info">
+                  <span class="node-title">Book Search</span>
+                  <span class="node-desc">Locating reference chapter</span>
+                </div>
+              </div>
+              <div class="stepper-line"></div>
+              <div class="step-node" id="step-scrape">
+                <div class="node-circle">🌐</div>
+                <div class="node-info">
+                  <span class="node-title">Fact Checking</span>
+                  <span class="node-desc">Extracting derivations</span>
+                </div>
+              </div>
+              <div class="stepper-line"></div>
+              <div class="step-node" id="step-synthesis">
+                <div class="node-circle">🧠</div>
+                <div class="node-info">
+                  <span class="node-title">AI Engine</span>
+                  <span class="node-desc">Running Gemini/Claude</span>
+                </div>
+              </div>
+              <div class="stepper-line"></div>
+              <div class="step-node" id="step-compile">
+                <div class="node-circle">✍️</div>
+                <div class="node-info">
+                  <span class="node-title">Handwritten Sheet</span>
+                  <span class="node-desc">Styling notebook & PDF</span>
+                </div>
+              </div>
+            </div>
+            <div class="stepper-progress-bar">
+              <div id="progress-bar-fill" class="progress-bar-fill"></div>
+            </div>
+          </div>
+
+        </div>
+      </section>
+
+      <!-- Animated Bookshelf Cabinet -->
+      <section class="bookshelf-section">
+        <div class="shelf-header">
+          <div class="shelf-title">
+            <span class="shelf-icon">🏛️</span>
+            <h3>Personal Academic Library</h3>
+          </div>
+          <span class="shelf-counter"><span id="book-count">0</span> Books on Shelf</span>
+        </div>
+
+        <div class="bookshelf-cabinet">
+          <div class="wood-top"></div>
+          
+          <!-- Top Shelf Rack (User Generated Books) -->
+          <div class="shelf-row">
+            <div class="shelf-books" id="shelf-books-container">
+              <!-- Dynamically populated -->
+            </div>
+            <div class="wood-plank"></div>
+          </div>
+
+          <!-- Bottom Shelf Rack (Pre-Stocked Standard Textbooks) -->
+          <div class="shelf-row bottom-row">
+            <div class="shelf-books decorative-row">
+              <div class="book decorative" style="--book-color: #065F46; height: 190px;" title="Stuart Russell & Peter Norvig (AI: A Modern Approach)">
+                <span class="spine-text">AI • Russell & Norvig</span>
+              </div>
+              <div class="book decorative" style="--book-color: #1E3A8A; height: 195px;" title="B.S. Grewal (Higher Engineering Mathematics)">
+                <span class="spine-text">Maths • B.S. Grewal</span>
+              </div>
+              <div class="book decorative" style="--book-color: #7A2828; height: 180px;" title="Halliday & Resnick (Fundamentals of Physics)">
+                <span class="spine-text">Physics • Halliday</span>
+              </div>
+              <div class="book decorative" style="--book-color: #854D0E; height: 190px;" title="Robert Boylestad (Electronic Devices)">
+                <span class="spine-text">ECE • Boylestad</span>
+              </div>
+              <div class="book decorative" style="--book-color: #4C1D95; height: 185px;" title="Thomas H. Cormen (Introduction to Algorithms)">
+                <span class="spine-text">Algorithms • Cormen</span>
+              </div>
+              <div class="book decorative" style="--book-color: #1F4E5B; height: 180px;" title="Gary Bradski & Adrian Kaehler (Learning OpenCV)">
+                <span class="spine-text">Vision • Bradski</span>
+              </div>
+            </div>
+            <div class="wood-plank"></div>
+          </div>
+        </div>
+      </section>
+
+    </main>
+
+    <!-- ====================================================================
+         AUTHENTIC WHITE RULED NOTEBOOK VIEWER (MATCHING USER SCREENSHOTS)
+         ==================================================================== -->
+    <div id="reading-modal" class="reading-modal hidden">
+      <div class="modal-backdrop" id="modal-backdrop"></div>
+      
+      <!-- Ruled Spiral Notebook Container -->
+      <div class="notebook-container">
+        
+        <!-- Spiral Binder Rings Left Border -->
+        <div class="notebook-spiral">
+          <span class="ring"></span><span class="ring"></span><span class="ring"></span>
+          <span class="ring"></span><span class="ring"></span><span class="ring"></span>
+          <span class="ring"></span><span class="ring"></span><span class="ring"></span>
+          <span class="ring"></span><span class="ring"></span><span class="ring"></span>
+          <span class="ring"></span><span class="ring"></span><span class="ring"></span>
+        </div>
+
+        <!-- White Ruled Page Content -->
+        <div class="ruled-page">
+          
+          <!-- Notebook Top Header Margin -->
+          <div class="notebook-top-margin">
+            <div class="page-meta-stamps">
+              <span class="stamp-date">Date: <strong id="modal-date">12/09/2026</strong></span>
+              <span class="stamp-subject">Subject: <strong id="modal-subject-tag">Academic Studies</strong></span>
+              <span class="stamp-book">Reference: <strong id="modal-book-tag">Authoritative Academic Reference</strong></span>
+            </div>
+            <div class="notebook-actions">
+              <button class="btn-action-minimize" id="btn-minimize-modal" title="Minimize notebook to bottom bar">
+                <span>🗕</span> Minimize
+              </button>
+              <button class="btn-action-delete" id="btn-delete-book" title="Delete from Shelf">
+                <span>🗑️</span> Delete
+              </button>
+              <button class="btn-close-notebook" id="btn-close-modal" title="Close Notebook">✕</button>
+            </div>
+          </div>
+
+          <!-- Document Title & Red Margin Line -->
+          <div class="notebook-body-area">
+            <div class="vertical-red-margin"></div>
+            
+            <div class="notebook-inner-content">
+              <!-- Topic Title Header -->
+              <div class="handwritten-title-banner">
+                <h1 id="modal-topic-title">Study Topic</h1>
+                <div class="study-sheet-badge">★ UNIVERSITY EXAM STUDY SHEET ★</div>
+              </div>
+
+              <!-- Quick Download Action Bar -->
+              <div class="notebook-downloads-bar">
+                <span class="dl-label">Download Copy:</span>
+                <div class="download-buttons" id="download-buttons-container"></div>
+                <button class="btn-action-copy" id="btn-copy-notes">
+                  <span>📋</span> Copy Notes
+                </button>
+              </div>
+
+              <!-- Executive Summary Tape Note -->
+              <div class="taped-summary-note">
+                <div class="tape-strip top-left"></div>
+                <div class="tape-strip top-right"></div>
+                <div class="note-label">⚡ EXECUTIVE SUMMARY (TL;DR)</div>
+                <p id="modal-summary-text"></p>
+              </div>
+
+              <!-- Main Handwritten Content Canvas -->
+              <div class="handwritten-notes-canvas" id="modal-markdown-content">
+                <!-- Dynamically rendered with highlighters and sticky notes -->
+              </div>
+
+              <!-- Verified Academic Citations -->
+              <div class="notebook-citations">
+                <h4>📚 Authoritative Academic & Research Citations</h4>
+                <ul id="modal-sources-list"></ul>
+              </div>
+            </div>
+
+          </div>
+
+        </div>
+
+      </div>
+    </div>
+
+    <!-- ====================================================================
+         TOKEN USAGE & MODEL LIMIT MODAL (CLICKED FROM "VIEW USAGE")
+         ==================================================================== -->
+    <div id="usage-modal" class="usage-modal hidden">
+      <div class="usage-modal-backdrop" id="usage-modal-backdrop"></div>
+      <div class="usage-modal-dialog">
+        <div class="usage-dialog-header">
+          <div class="usage-dialog-title">
+            <span class="dialog-icon">⚡</span>
+            <div>
+              <h3>AI Engine Token Usage & Limits</h3>
+              <p class="dialog-sub">Live monitoring of OpenRouter AI token consumption</p>
+            </div>
+          </div>
+          <button type="button" class="btn-close-usage" id="btn-close-usage" title="Close">✕</button>
+        </div>
+
+        <div class="usage-dialog-body">
+          <!-- Meter Gauge -->
+          <div class="usage-gauge-card">
+            <div class="gauge-top-row">
+              <span class="gauge-label">Session Token Consumption</span>
+              <span class="gauge-badge healthy" id="gauge-status-badge">🟢 Budget Healthy</span>
+            </div>
+            <div class="gauge-numbers">
+              <span class="gauge-current" id="gauge-tokens-num">0</span>
+              <span class="gauge-max" id="gauge-quota-num">/ 50,000 tokens</span>
+            </div>
+            <div class="usage-meter-track">
+              <div class="usage-meter-fill" id="usage-meter-fill" style="width: 0%;"></div>
+            </div>
+            <div class="gauge-bottom-row">
+              <span id="gauge-percent-text">0.0% used</span>
+              <span id="gauge-remaining-text">50,000 tokens remaining</span>
+            </div>
+          </div>
+
+          <!-- Over Limit Error Callout (Shows if over limit or 402) -->
+          <div id="usage-over-limit-box" class="usage-over-limit-box hidden">
+            <div class="limit-box-header">
+              <span>⚠️</span> <strong>Model Token Limit Exceeded / Over Budget</strong>
+            </div>
+            <p id="usage-over-limit-reason">Selected model requires more tokens than available in the current tier. OpenRouter reported budget limit (Error 402).</p>
+            <div class="limit-box-action">
+              <button type="button" class="btn-box-switch" id="btn-box-switch-free">⚡ Switch to 100% Free Engine (Nemotron 3.5)</button>
+            </div>
+          </div>
+
+          <!-- Model Context Window & Token Specs -->
+          <div class="models-specs-section">
+            <h4>Available Models Context Windows & Specs</h4>
+            <div class="model-spec-grid">
+              <div class="spec-row">
+                <span class="m-title">Gemini 3.8 Flash</span>
+                <span class="m-spec">1,000,000 Context</span>
+                <span class="m-pill fast">Fast</span>
+                <span class="m-status ok">Ready</span>
+              </div>
+              <div class="spec-row">
+                <span class="m-title">Gemini 3.7 Flash</span>
+                <span class="m-spec">1,000,000 Context</span>
+                <span class="m-pill fast">Fast</span>
+                <span class="m-status ok">Ready</span>
+              </div>
+              <div class="spec-row">
+                <span class="m-title">Gemini 3.6 Flash</span>
+                <span class="m-spec">1,000,000 Context</span>
+                <span class="m-pill fast">Fast</span>
+                <span class="m-status ok">Ready</span>
+              </div>
+              <div class="spec-row">
+                <span class="m-title">Gemini 3.1 Pro</span>
+                <span class="m-spec">128,000 Context</span>
+                <span class="m-pill low">Low</span>
+                <span class="m-status ok">Ready</span>
+              </div>
+              <div class="spec-row">
+                <span class="m-title">Claude Sonnet 4.6</span>
+                <span class="m-spec">200,000 Context</span>
+                <span class="m-pill think">Thinking</span>
+                <span class="m-status ok">Ready</span>
+              </div>
+              <div class="spec-row">
+                <span class="m-title">Claude Opus 4.6</span>
+                <span class="m-spec">200,000 Context</span>
+                <span class="m-pill think">Thinking</span>
+                <span class="m-status ok">Ready</span>
+              </div>
+              <div class="spec-row">
+                <span class="m-title">GPT-OSS 120B</span>
+                <span class="m-spec">128,000 Context</span>
+                <span class="m-pill med">Medium</span>
+                <span class="m-status ok">Ready</span>
+              </div>
+              <div class="spec-row free-row">
+                <span class="m-title">Nemotron 3.5 (Free Backup)</span>
+                <span class="m-spec">128K Unlimited</span>
+                <span class="m-pill free">100% Free</span>
+                <span class="m-status ok">Zero Cost</span>
+              </div>
+            </div>
+          </div>
+
+        </div>
+
+        <div class="usage-dialog-footer">
+          <button type="button" class="btn-reset-tokens" id="btn-reset-tokens">🔄 Reset Counter</button>
+          <button type="button" class="btn-dialog-close" id="btn-dialog-close">Close</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Floating Minimized Notebook Bar (for when notes are minimized) -->
+    <div id="minimized-notebook-bar" class="minimized-notebook-bar hidden">
+      <div class="min-content-left" id="min-bar-trigger">
+        <span class="min-pulse-dot"></span>
+        <span class="min-icon">📖</span>
+        <div class="min-text-info">
+          <span class="min-title" id="min-notebook-title">Study Notes</span>
+          <span class="min-sub">Click to restore notebook 🗖</span>
+        </div>
+      </div>
+      <div class="min-actions">
+        <button type="button" class="min-btn-expand" id="min-btn-expand" title="Restore Notebook">🗖 Expand</button>
+        <button type="button" class="min-btn-close" id="min-btn-close" title="Close">✕</button>
+      </div>
+    </div>
+
+    <!-- Custom Subject Modal -->
+    <div id="custom-subject-modal" class="usage-modal hidden">
+      <div class="usage-modal-backdrop" id="custom-modal-backdrop"></div>
+      <div class="usage-modal-dialog" style="max-width: 440px;">
+        <div class="usage-dialog-header">
+          <div class="usage-dialog-title">
+            <span class="dialog-icon">✏️</span>
+            <div>
+              <h3>Specify Custom Subject</h3>
+              <p class="dialog-sub">Enter any subject, course title, or academic field</p>
+            </div>
+          </div>
+          <button type="button" class="btn-close-usage" id="btn-close-custom-modal">✕</button>
+        </div>
+        <div class="usage-dialog-body" style="padding: 20px 24px;">
+          <label style="display: block; font-size: 13px; font-weight: 600; color: #cbd5e1; margin-bottom: 8px;">
+            Subject or Academic Domain:
+          </label>
+          <input 
+            type="text" 
+            id="custom-subject-input" 
+            placeholder="e.g. 'Computer Vision', 'Robotics & Control', 'Biochemistry', 'Operating Systems'..." 
+            style="width: 100%; padding: 12px 14px; background: rgba(15, 23, 42, 0.8); border: 1px solid rgba(255, 255, 255, 0.15); border-radius: 8px; color: #f8fafc; font-size: 14px; font-family: inherit; outline: none; box-sizing: border-box;"
+          />
+          <p style="font-size: 12px; color: #94a3b8; margin-top: 10px; line-height: 1.5;">
+            The engine will ground its research and derivations specifically within this subject area.
+          </p>
+        </div>
+        <div class="usage-dialog-footer" style="display: flex; justify-content: flex-end; gap: 10px;">
+          <button type="button" class="btn-dialog-close" id="btn-cancel-custom-subject">Cancel</button>
+          <button type="button" class="btn-alert-switch" id="btn-save-custom-subject" style="background: linear-gradient(135deg, #2563eb, #3b82f6); border: none;">Apply Subject</button>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <script src="/static/app.js?v=6.0"></script>
+</body>
+</html>

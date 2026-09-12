@@ -1,0 +1,37 @@
+# Environment & Secret Keys (DO NOT COMMIT)
+.env
+.env.*
+!.env.example
+
+# Python Virtual Environment
+.venv/
+venv/
+env/
+ENV/
+
+# Python Cache & Bytecode
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+
+# Browser Profiles & WebDriver Cache
+.wweb_profile/
+.gui_agent_profile/
+.wdm/
+chromedriver*
+
+# Generated Output Documents
+generated_notes/
+*.pdf
+*.docx
+*.pptx
+
+# Application Logs
+*.log
+whatsapp_agent.log
+
+# System & IDE files
+.DS_Store
+.vscode/
+.idea/
