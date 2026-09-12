@@ -245,7 +245,10 @@ class StudyAgentOrchestrator:
         query: str,
         gui_model: str = "openai/gpt-4o-mini",
         gui_subject: str = "",
-        requested_formats: list[str] | None = None
+        requested_formats: list[str] | None = None,
+        use_gui_agent: bool = False,
+        gui_target: str = "auto",
+        headless: bool = False
     ) -> dict:
         """Run full research, authoritative textbook grounding, and note-styling pipeline."""
         if not requested_formats:
@@ -256,27 +259,53 @@ class StudyAgentOrchestrator:
         intent: StudyIntent = AcademicRouter.parse_student_query(query, gui_model, gui_subject)
         logger.info(f"Academic Intent Resolved: {intent.understanding_briefing}")
 
-        # 2. Research & Academic Web Scraping
+        # 2. Research & Academic Content Retrieval (GUI Agent or Serper Scraper)
+        active_gui_agent = use_gui_agent or getattr(intent, "use_gui_agent", False)
+        active_gui_target = gui_target if (gui_target and gui_target != "auto") else getattr(intent, "gui_target", "auto")
+        web_context = ""
+        sources_list = []
         search_results = []
-        for q in intent.optimized_queries[:2]:
-            results = self.serper.search_educational_notes(q, num_results=3)
-            search_results.extend(results)
 
-        # Scrape top URLs
-        urls_to_scrape = [res["link"] for res in search_results if res.get("link")]
-        scraped_pages = self.scraper.scrape_multiple(urls_to_scrape, max_total_chars=4000)
+        if active_gui_agent:
+            logger.info(f"🤖 [GUI Browser Agent] Operating like a human on target: {active_gui_target.upper()} Web...")
+            from .gui_agent import HumanGUIAgent
+            try:
+                gui_operator = HumanGUIAgent(headless=headless)
+                gui_res = gui_operator.research_topic(target=active_gui_target, topic=intent.cleaned_topic)
+                gui_operator.close()
 
-        # Build curated academic context
-        context_parts = [
-            f"Subject: {intent.subject_name}",
-            f"Authoritative Reference: {intent.target_book}"
-        ]
-        for idx, res in enumerate(search_results[:4], 1):
-            context_parts.append(f"Source [{idx}] {res.get('title')}: {res.get('snippet')}")
-        for page in scraped_pages[:3]:
-            context_parts.append(f"Text from {page['url']}:\n{page['content']}")
+                if gui_res.get("content"):
+                    web_context = (
+                        f"Primary Verified Source: {gui_res.get('source')}\n"
+                        f"URL: {gui_res.get('url', '')}\n\n"
+                        f"Content Extracted via Web Agent:\n{gui_res.get('content')}\n\n"
+                        f"Authoritative Textbook Grounding: {intent.target_book}"
+                    )
+                    sources_list = gui_res.get("sources", [{"title": gui_res.get("source"), "link": gui_res.get("url", "#")}])
+            except Exception as gui_err:
+                logger.error(f"GUI Agent operation encountered error: {gui_err}. Falling back to standard research...")
 
-        web_context = "\n\n".join(context_parts)
+        # Fallback to Serper & Scraper if web_context is still empty
+        if not web_context:
+            search_results = []
+            for q in intent.optimized_queries[:2]:
+                results = self.serper.search_educational_notes(q, num_results=3)
+                search_results.extend(results)
+
+            urls_to_scrape = [res["link"] for res in search_results if res.get("link")]
+            scraped_pages = self.scraper.scrape_multiple(urls_to_scrape, max_total_chars=4000)
+
+            context_parts = [
+                f"Subject: {intent.subject_name}",
+                f"Authoritative Reference: {intent.target_book}"
+            ]
+            for idx, res in enumerate(search_results[:4], 1):
+                context_parts.append(f"Source [{idx}] {res.get('title')}: {res.get('snippet')}")
+                sources_list.append({"title": res.get("title", ""), "link": res.get("link", "")})
+            for page in scraped_pages[:3]:
+                context_parts.append(f"Text from {page['url']}:\n{page['content']}")
+
+            web_context = "\n\n".join(context_parts)
 
         # 3. Synthesize Handwritten Student Study Sheet
         logger.info(f"Synthesizing study sheet using {intent.selected_model}...")
@@ -369,7 +398,7 @@ class StudyAgentOrchestrator:
             "briefing": intent.understanding_briefing,
             "notes_markdown": full_notes_markdown,
             "summary": summary_text,
-            "sources": [{"title": r.get("title", ""), "link": r.get("link", ""), "snippet": r.get("snippet", "")} for r in search_results[:4]],
+            "sources": sources_list if sources_list else [{"title": r.get("title", ""), "link": r.get("link", ""), "snippet": r.get("snippet", "")} for r in search_results[:4]],
             "files": files,
             "color": book_color,
             "created_at": datetime.now().strftime("%B %d, %Y • %I:%M %p")

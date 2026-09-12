@@ -73,6 +73,60 @@ class GenerateRequest(BaseModel):
     model: str = "google/gemini-3.8-flash"
     subject: str = ""
     formats: list[str] = ["handwritten", "pdf"]
+    gui_agent: bool = False
+    gui_target: str = "auto"
+    headless: bool = False
+
+@app.get("/api/gui-agent/status")
+def get_gui_agent_status():
+    """Check GUI agent readiness, Chrome availability, and profile status."""
+    import shutil
+    chrome_path = shutil.which("google-chrome") or shutil.which("chromium")
+    profile_dir = Path("./.gui_agent_profile").resolve()
+    return {
+        "status": "ready" if chrome_path else "missing_chrome",
+        "chrome_installed": bool(chrome_path),
+        "chrome_path": chrome_path,
+        "profile_dir": str(profile_dir),
+        "profile_exists": profile_dir.exists(),
+        "supported_targets": [
+            {"id": "perplexity", "name": "Perplexity AI Web", "requires_login": False, "badge": "Instant • No Login"},
+            {"id": "claude", "name": "Claude AI Web", "requires_login": True, "badge": "1-Time Login in Chrome"},
+            {"id": "gemini", "name": "Google Gemini Web", "requires_login": True, "badge": "1-Time Google Sign-in"},
+            {"id": "google", "name": "Google Search Web", "requires_login": False, "badge": "Web Search & AI Overview"}
+        ]
+    }
+
+class LaunchLoginRequest(BaseModel):
+    target: str = "claude"
+
+@app.post("/api/gui-agent/launch-login")
+def launch_login_browser(req: LaunchLoginRequest):
+    """Open a visible Chrome browser on desktop for one-time login setup."""
+    import subprocess
+    profile_dir = Path("./.gui_agent_profile").resolve()
+    profile_dir.mkdir(parents=True, exist_ok=True)
+    
+    # Clean any stale Singleton locks
+    for s_name in ["SingletonLock", "SingletonSocket", "SingletonCookie"]:
+        try:
+            (profile_dir / s_name).unlink(missing_ok=True)
+        except Exception:
+            pass
+
+    url = "https://claude.ai" if req.target == "claude" else "https://gemini.google.com"
+    cmd = f'DISPLAY=:0 google-chrome --user-data-dir="{str(profile_dir)}" --no-sandbox --start-maximized "{url}" >/dev/null 2>&1 &'
+    try:
+        subprocess.Popen(cmd, shell=True)
+        return {
+            "status": "launched",
+            "target": req.target,
+            "url": url,
+            "message": f"Visible Chrome window opened for {req.target}. Please sign in to save your session."
+        }
+    except Exception as e:
+        logger.error(f"Failed to launch Chrome for login: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 @app.api_route("/", methods=["GET", "HEAD"])
 def serve_index():
@@ -101,7 +155,7 @@ def get_token_usage():
     usage_data = orchestrator.tracker.to_dict()
     # Add metadata for UI display
     usage_data["default_model"] = orchestrator.default_model
-    usage_data["free_fallback"] = "nvidia/nemotron-3.5-lightning:free"
+    usage_data["free_fallback"] = "poolside/laguna-s-2.1:free"
     return usage_data
 
 @app.post("/api/usage/reset")
@@ -164,7 +218,10 @@ def generate_study_notes(req: GenerateRequest):
             query=req.topic,
             gui_model=req.model,
             gui_subject=req.subject,
-            requested_formats=req.formats
+            requested_formats=req.formats,
+            use_gui_agent=req.gui_agent,
+            gui_target=req.gui_target,
+            headless=req.headless
         )
         _save_history(package)
         return package

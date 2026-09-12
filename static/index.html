@@ -102,6 +102,61 @@
               </div>
             </div>
 
+            <!-- Engine Mode Switcher (API Engine vs Human GUI Browser Agent) -->
+            <div class="engine-mode-container">
+              <div class="engine-mode-tabs">
+                <button type="button" class="engine-tab active" id="tab-mode-api" title="Direct API inference with model selector">
+                  <span class="tab-icon">⚡</span>
+                  <span class="tab-label">Fast API Engine</span>
+                </button>
+                <button type="button" class="engine-tab" id="tab-mode-gui" title="Autonomous Selenium Chrome browser operating web AI like a human">
+                  <span class="tab-icon">🤖</span>
+                  <span class="tab-label">Human GUI Browser Agent</span>
+                  <span class="tab-pulse-badge">Chrome Automation</span>
+                </button>
+              </div>
+
+              <!-- GUI Browser Agent Target Selector (Active when GUI Agent is selected) -->
+              <div class="gui-agent-bar hidden" id="gui-agent-bar">
+                <div class="gui-targets-row">
+                  <span class="gui-bar-label">🌐 Web Platform:</span>
+                  <div class="gui-target-chips">
+                    <button type="button" class="gui-target-chip active" data-target="perplexity" title="Perplexity AI Web (Instant search synthesis, no login required)">
+                      <span class="target-dot emerald"></span>
+                      <span class="target-text">Perplexity Web</span>
+                      <span class="target-badge instant">Instant • No Login</span>
+                    </button>
+                    <button type="button" class="gui-target-chip" data-target="claude" title="Claude AI Web (claude.ai - human-like typing and streaming extraction)">
+                      <span class="target-dot purple"></span>
+                      <span class="target-text">Claude AI Web</span>
+                      <span class="target-badge">claude.ai</span>
+                    </button>
+                    <button type="button" class="gui-target-chip" data-target="gemini" title="Google Gemini Web (gemini.google.com)">
+                      <span class="target-dot blue"></span>
+                      <span class="target-text">Gemini Web</span>
+                      <span class="target-badge">gemini</span>
+                    </button>
+                    <button type="button" class="gui-target-chip" data-target="google" title="Google Search (AI Overview & Academic Search)">
+                      <span class="target-dot yellow"></span>
+                      <span class="target-text">Google Search</span>
+                      <span class="target-badge">AI Overview</span>
+                    </button>
+                  </div>
+                </div>
+
+                <div class="gui-options-row">
+                  <label class="gui-visible-label" title="Show browser window on desktop so you can watch typing and navigation in real-time">
+                    <input type="checkbox" id="gui-visible-toggle" checked />
+                    <span class="toggle-text">🖥️ Visible Chrome Window</span>
+                  </label>
+                  <button type="button" class="btn-gui-setup" id="btn-open-login-modal" title="Open Chrome to log in once for Claude AI or Gemini">
+                    <span class="btn-icon">🔑</span>
+                    <span class="btn-title">1-Click Login Setup</span>
+                  </button>
+                </div>
+              </div>
+            </div>
+
             <div class="input-wrapper">
               <span class="input-icon">✏️</span>
               <input 
@@ -664,6 +719,63 @@
         <div class="usage-dialog-footer" style="display: flex; justify-content: flex-end; gap: 10px;">
           <button type="button" class="btn-dialog-close" id="btn-cancel-custom-subject">Cancel</button>
           <button type="button" class="btn-alert-switch" id="btn-save-custom-subject" style="background: linear-gradient(135deg, #2563eb, #3b82f6); border: none;">Apply Subject</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- GUI Browser Agent 1-Click Login Setup Modal -->
+    <div id="gui-login-modal" class="usage-modal hidden">
+      <div class="usage-modal-backdrop" id="gui-login-backdrop"></div>
+      <div class="usage-modal-dialog" style="max-width: 480px;">
+        <div class="usage-dialog-header">
+          <div class="usage-dialog-title">
+            <span class="dialog-icon">🤖</span>
+            <div>
+              <h3>Browser Agent • 1-Click Login Setup</h3>
+              <p class="dialog-sub">Log in once to save session in dedicated Chrome profile</p>
+            </div>
+          </div>
+          <button type="button" class="btn-close-usage" id="btn-close-gui-login">✕</button>
+        </div>
+        <div class="usage-dialog-body" style="padding: 20px 24px;">
+          <p style="font-size: 13px; color: #cbd5e1; line-height: 1.6; margin-bottom: 16px;">
+            To let the GUI agent fetch notes from <strong>Claude AI</strong> or <strong>Google Gemini</strong>, sign in once in the browser window. Your login session will be permanently saved in <code>.gui_agent_profile</code> on your computer.
+          </p>
+          <div style="display: flex; flex-direction: column; gap: 12px;">
+            <button type="button" class="btn-login-option" id="btn-launch-claude-login">
+              <div style="display: flex; align-items: center; gap: 10px;">
+                <span style="font-size: 20px;">🟣</span>
+                <div style="text-align: left;">
+                  <div style="font-weight: 600; color: #f8fafc;">Log into Claude AI</div>
+                  <div style="font-size: 11px; color: #a78bfa; font-weight: 400;">Opens claude.ai in visible Chrome</div>
+                </div>
+              </div>
+              <span style="font-size: 18px; color: #a78bfa;">↗</span>
+            </button>
+
+            <button type="button" class="btn-login-option" id="btn-launch-gemini-login">
+              <div style="display: flex; align-items: center; gap: 10px;">
+                <span style="font-size: 20px;">🔵</span>
+                <div style="text-align: left;">
+                  <div style="font-weight: 600; color: #f8fafc;">Log into Google Gemini</div>
+                  <div style="font-size: 11px; color: #60a5fa; font-weight: 400;">Opens gemini.google.com in visible Chrome</div>
+                </div>
+              </div>
+              <span style="font-size: 18px; color: #60a5fa;">↗</span>
+            </button>
+
+            <div style="display: flex; align-items: center; gap: 10px; padding: 10px 14px; background: rgba(16, 185, 129, 0.1); border: 1px solid rgba(16, 185, 129, 0.25); border-radius: 8px;">
+              <span style="font-size: 16px;">🟢</span>
+              <div style="font-size: 12px; color: #34d399; line-height: 1.4;">
+                <strong>Perplexity Web</strong> and <strong>Google Search</strong> do not require any login and work immediately!
+              </div>
+            </div>
+          </div>
+          <div id="login-launch-feedback" class="hidden" style="margin-top: 14px; padding: 10px 14px; background: rgba(30, 41, 59, 0.9); border: 1px solid rgba(96, 165, 250, 0.3); border-radius: 8px; font-size: 12px; color: #93c5fd; text-align: center;">
+          </div>
+        </div>
+        <div class="usage-dialog-footer" style="display: flex; justify-content: flex-end;">
+          <button type="button" class="btn-dialog-close" id="btn-done-gui-login">Done</button>
         </div>
       </div>
     </div>

@@ -11,6 +11,8 @@ class StudyIntent(NamedTuple):
     selected_model: str
     understanding_briefing: str
     optimized_queries: list[str]
+    use_gui_agent: bool = False
+    gui_target: str = "auto"
 
 # Backwards compatibility alias
 FerozIntent = StudyIntent
@@ -39,10 +41,37 @@ class AcademicRouter:
     @staticmethod
     def parse_student_query(raw_prompt: str, gui_model: str = "google/gemini-3.8-flash", gui_subject: str = "") -> StudyIntent:
         prompt_lower = raw_prompt.lower().strip()
-
-        # 1. Detect explicit model command in chat
-        chosen_model = gui_model
         clean_text = raw_prompt
+
+        # 1. Detect GUI Browser Agent command in chat
+        use_gui = False
+        gui_target = "auto"
+
+        if any(kw in prompt_lower for kw in ["from claude", "claude ai", "claude web", "use claude"]):
+            use_gui = True
+            gui_target = "claude"
+            clean_text = re.sub(r"\b(and\s+)?(take|get|fetch)\s+(this\s+)?content\s+from\s+claude(\s+ai)?:?\s*", "", clean_text, flags=re.IGNORECASE).strip()
+            clean_text = re.sub(r"\b(use\s+)?claude(\s+ai)?(\s+web)?(\s+to)?\b", "", clean_text, flags=re.IGNORECASE).strip()
+            clean_text = re.sub(r"\b(from|on)\s+claude(\s+ai)?\b", "", clean_text, flags=re.IGNORECASE).strip()
+        elif any(kw in prompt_lower for kw in ["from gemini", "gemini web", "use gemini"]):
+            use_gui = True
+            gui_target = "gemini"
+            clean_text = re.sub(r"\b(and\s+)?(take|get|fetch)\s+(this\s+)?content\s+from\s+gemini(\s+ai)?:?\s*", "", clean_text, flags=re.IGNORECASE).strip()
+            clean_text = re.sub(r"\b(use\s+)?gemini(\s+ai)?(\s+web)?(\s+to)?\b", "", clean_text, flags=re.IGNORECASE).strip()
+            clean_text = re.sub(r"\b(from|on)\s+gemini\b", "", clean_text, flags=re.IGNORECASE).strip()
+        elif any(kw in prompt_lower for kw in ["from perplexity", "perplexity web", "use perplexity"]):
+            use_gui = True
+            gui_target = "perplexity"
+            clean_text = re.sub(r"\b(and\s+)?(take|get|fetch)\s+(this\s+)?content\s+from\s+perplexity:?\s*", "", clean_text, flags=re.IGNORECASE).strip()
+            clean_text = re.sub(r"\b(use\s+)?perplexity(\s+ai)?(\s+web)?(\s+to)?\b", "", clean_text, flags=re.IGNORECASE).strip()
+            clean_text = re.sub(r"\b(from|on)\s+perplexity\b", "", clean_text, flags=re.IGNORECASE).strip()
+        elif any(kw in prompt_lower for kw in ["gui agent", "browser agent", "browse google", "search on google", "use google"]):
+            use_gui = True
+            gui_target = "google" if "google" in prompt_lower else "perplexity"
+            clean_text = re.sub(r"\b(gui agent|browser agent|use browser|browse google|search on google|use google(\s+search)?)\b", "", clean_text, flags=re.IGNORECASE).strip()
+
+        # 2. Detect explicit model command in chat
+        chosen_model = gui_model
 
         # Check specific models first
         if "gemini 3.8" in prompt_lower or "gemini-3.8" in prompt_lower:
@@ -148,10 +177,16 @@ class AcademicRouter:
         model_name = chosen_model.split("/")[-1].upper()
 
         # 3. Create Professional Academic Briefing
-        briefing = (
-            f"🎯 **Academic Focus**: **{subject_name}** | Topic: **{final_topic}** | "
-            f"Reference: *{target_book}* | Engine: **{model_name}**"
-        )
+        if use_gui:
+            briefing = (
+                f"🤖 **Human GUI Browser Agent**: Operating **{gui_target.upper()} Web** | "
+                f"Topic: **{final_topic}** | Reference: *{target_book}*"
+            )
+        else:
+            briefing = (
+                f"🎯 **Academic Focus**: **{subject_name}** | Topic: **{final_topic}** | "
+                f"Reference: *{target_book}* | Engine: **{model_name}**"
+            )
 
         # 4. Generate Authoritative Search Queries
         queries = [
@@ -168,7 +203,9 @@ class AcademicRouter:
             target_book=target_book,
             selected_model=chosen_model,
             understanding_briefing=briefing,
-            optimized_queries=queries
+            optimized_queries=queries,
+            use_gui_agent=use_gui,
+            gui_target=gui_target
         )
 
 # Backwards compatibility alias

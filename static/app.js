@@ -5,6 +5,7 @@
 document.addEventListener("DOMContentLoaded", () => {
   initAmbientCanvas();
   initModelDropdown();
+  initGuiAgentControls();
   initUsageModal();
   initSubjectChips();
   initCustomSubjectModal();
@@ -18,6 +19,9 @@ let currentPackage = null;
 let selectedModel = "google/gemini-3.8-flash";
 let selectedSubject = "AUTO";
 let customSubjectName = "";
+let isGuiAgentActive = false;
+let selectedGuiTarget = "perplexity";
+let isGuiVisible = true;
 
 // Authoritative reference mapping for academic disciplines
 const SUBJECT_TEXTBOOKS = {
@@ -88,6 +92,137 @@ function initAmbientCanvas() {
   }
 
   render();
+}
+
+/* --------------------------------------------------------------------------
+   1.5. HUMAN GUI BROWSER AGENT CONTROLS & 1-CLICK LOGIN SETUP
+   -------------------------------------------------------------------------- */
+function initGuiAgentControls() {
+  const tabApi = document.getElementById("tab-mode-api");
+  const tabGui = document.getElementById("tab-mode-gui");
+  const guiBar = document.getElementById("gui-agent-bar");
+  const targetChips = document.querySelectorAll(".gui-target-chip");
+  const visibleToggle = document.getElementById("gui-visible-toggle");
+
+  const loginModal = document.getElementById("gui-login-modal");
+  const loginBackdrop = document.getElementById("gui-login-backdrop");
+  const btnOpenLogin = document.getElementById("btn-open-login-modal");
+  const btnCloseLogin = document.getElementById("btn-close-gui-login");
+  const btnDoneLogin = document.getElementById("btn-done-gui-login");
+  const btnLaunchClaude = document.getElementById("btn-launch-claude-login");
+  const btnLaunchGemini = document.getElementById("btn-launch-gemini-login");
+  const loginFeedback = document.getElementById("login-launch-feedback");
+
+  function setEngineMode(isGui) {
+    isGuiAgentActive = isGui;
+    if (isGui) {
+      if (tabGui) tabGui.classList.add("active");
+      if (tabApi) tabApi.classList.remove("active");
+      if (guiBar) guiBar.classList.remove("hidden");
+    } else {
+      if (tabApi) tabApi.classList.add("active");
+      if (tabGui) tabGui.classList.remove("active");
+      if (guiBar) guiBar.classList.add("hidden");
+    }
+  }
+
+  function setGuiTarget(target) {
+    selectedGuiTarget = target;
+    targetChips.forEach((c) => {
+      if (c.getAttribute("data-target") === target) {
+        c.classList.add("active");
+      } else {
+        c.classList.remove("active");
+      }
+    });
+  }
+
+  if (tabApi) {
+    tabApi.addEventListener("click", () => setEngineMode(false));
+  }
+  if (tabGui) {
+    tabGui.addEventListener("click", () => setEngineMode(true));
+  }
+
+  targetChips.forEach((chip) => {
+    chip.addEventListener("click", () => {
+      const target = chip.getAttribute("data-target");
+      if (target) setGuiTarget(target);
+    });
+  });
+
+  if (visibleToggle) {
+    visibleToggle.addEventListener("change", (e) => {
+      isGuiVisible = e.target.checked;
+    });
+  }
+
+  // Modal open/close
+  function openLoginModal() {
+    if (loginModal) loginModal.classList.remove("hidden");
+    if (loginFeedback) loginFeedback.classList.add("hidden");
+  }
+  function closeLoginModal() {
+    if (loginModal) loginModal.classList.add("hidden");
+  }
+
+  if (btnOpenLogin) btnOpenLogin.addEventListener("click", openLoginModal);
+  if (btnCloseLogin) btnCloseLogin.addEventListener("click", closeLoginModal);
+  if (btnDoneLogin) btnDoneLogin.addEventListener("click", closeLoginModal);
+  if (loginBackdrop) loginBackdrop.addEventListener("click", closeLoginModal);
+
+  async function launchLoginBrowser(target) {
+    if (loginFeedback) {
+      loginFeedback.classList.remove("hidden");
+      loginFeedback.innerHTML = `<span>⏳ Launching Google Chrome on desktop for ${target === "claude" ? "Claude AI" : "Gemini"}...</span>`;
+    }
+    try {
+      const res = await fetch("/api/gui-agent/launch-login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ target })
+      });
+      if (res.ok) {
+        if (loginFeedback) {
+          loginFeedback.innerHTML = `<span>✅ <strong>Chrome window opened!</strong> Please log in in the opened Chrome browser. Your session will remain saved permanently.</span>`;
+        }
+      } else {
+        throw new Error("Failed to launch Chrome");
+      }
+    } catch (err) {
+      if (loginFeedback) {
+        loginFeedback.innerHTML = `<span style="color: #f87171;">⚠️ Error launching browser: ${err.message}</span>`;
+      }
+    }
+  }
+
+  if (btnLaunchClaude) {
+    btnLaunchClaude.addEventListener("click", () => launchLoginBrowser("claude"));
+  }
+  if (btnLaunchGemini) {
+    btnLaunchGemini.addEventListener("click", () => launchLoginBrowser("gemini"));
+  }
+
+  // Natural language detection in topic input
+  const topicInput = document.getElementById("topic-input");
+  if (topicInput) {
+    topicInput.addEventListener("input", (e) => {
+      const text = e.target.value.toLowerCase();
+      if (text.includes("claude")) {
+        setEngineMode(true);
+        setGuiTarget("claude");
+      } else if (text.includes("gemini web") || (text.includes("from gemini") && !text.includes("flash"))) {
+        setEngineMode(true);
+        setGuiTarget("gemini");
+      } else if (text.includes("perplexity") || text.includes("from perplexity")) {
+        setEngineMode(true);
+        setGuiTarget("perplexity");
+      } else if (text.includes("gui agent") || text.includes("browser agent") || text.includes("google search")) {
+        setEngineMode(true);
+        setGuiTarget("google");
+      }
+    });
+  }
 }
 
 /* --------------------------------------------------------------------------
@@ -579,11 +714,16 @@ function initForm() {
     // Show Briefing
     if (briefingCard && briefingText) {
       briefingCard.classList.remove("hidden");
-      briefingText.textContent = `Analyzing academic literature and citations via ${selectedModel.split('/')[1] || selectedModel}...`;
+      if (isGuiAgentActive) {
+        const targetLabel = selectedGuiTarget === "claude" ? "Claude AI Web" : (selectedGuiTarget === "gemini" ? "Google Gemini Web" : (selectedGuiTarget === "google" ? "Google Search" : "Perplexity Web"));
+        briefingText.textContent = `🤖 Human GUI Browser Agent: Opening ${targetLabel} in Chrome to retrieve authoritative academic content...`;
+      } else {
+        briefingText.textContent = `Analyzing academic literature and citations via ${selectedModel.split('/')[1] || selectedModel}...`;
+      }
     }
 
     // Run animation stepper progression
-    const stopStepper = runStepperAnimation();
+    const stopStepper = runStepperAnimation(isGuiAgentActive, selectedGuiTarget);
 
     try {
       const res = await fetch("/api/generate", {
@@ -593,7 +733,10 @@ function initForm() {
           topic,
           model: selectedModel,
           subject: selectedSubject,
-          formats
+          formats,
+          gui_agent: isGuiAgentActive,
+          gui_target: selectedGuiTarget,
+          headless: !isGuiVisible
         }),
       });
 
@@ -647,13 +790,72 @@ function initForm() {
   });
 }
 
-function runStepperAnimation() {
+function runStepperAnimation(isGui = false, target = "perplexity") {
   const steps = [
     { id: "step-search", progress: 25 },
     { id: "step-scrape", progress: 50 },
     { id: "step-synthesis", progress: 75 },
     { id: "step-compile", progress: 95 },
   ];
+
+  // Dynamically customize stepper labels based on engine mode
+  const searchNode = document.getElementById("step-search");
+  const scrapeNode = document.getElementById("step-scrape");
+  const synthNode = document.getElementById("step-synthesis");
+  const compileNode = document.getElementById("step-compile");
+
+  if (isGui) {
+    const targetName = target === "claude" ? "Claude AI" : (target === "gemini" ? "Gemini" : (target === "google" ? "Google" : "Perplexity"));
+    if (searchNode) {
+      const title = searchNode.querySelector(".node-title");
+      const desc = searchNode.querySelector(".node-desc");
+      if (title) title.textContent = "🖥️ Chrome Session";
+      if (desc) desc.textContent = "Launching browser agent";
+    }
+    if (scrapeNode) {
+      const title = scrapeNode.querySelector(".node-title");
+      const desc = scrapeNode.querySelector(".node-desc");
+      if (title) title.textContent = `🌐 ${targetName} Web`;
+      if (desc) desc.textContent = "Navigating & human typing";
+    }
+    if (synthNode) {
+      const title = synthNode.querySelector(".node-title");
+      const desc = synthNode.querySelector(".node-desc");
+      if (title) title.textContent = "📥 Content Stream";
+      if (desc) desc.textContent = "Extracting generated answer";
+    }
+    if (compileNode) {
+      const title = compileNode.querySelector(".node-title");
+      const desc = compileNode.querySelector(".node-desc");
+      if (title) title.textContent = "📖 Alexandria Synthesis";
+      if (desc) desc.textContent = "Compiling notes & PDF";
+    }
+  } else {
+    if (searchNode) {
+      const title = searchNode.querySelector(".node-title");
+      const desc = searchNode.querySelector(".node-desc");
+      if (title) title.textContent = "Book Search";
+      if (desc) desc.textContent = "Locating reference chapter";
+    }
+    if (scrapeNode) {
+      const title = scrapeNode.querySelector(".node-title");
+      const desc = scrapeNode.querySelector(".node-desc");
+      if (title) title.textContent = "Fact Checking";
+      if (desc) desc.textContent = "Extracting derivations";
+    }
+    if (synthNode) {
+      const title = synthNode.querySelector(".node-title");
+      const desc = synthNode.querySelector(".node-desc");
+      if (title) title.textContent = "AI Engine";
+      if (desc) desc.textContent = "Running Gemini/Claude";
+    }
+    if (compileNode) {
+      const title = compileNode.querySelector(".node-title");
+      const desc = compileNode.querySelector(".node-desc");
+      if (title) title.textContent = "Handwritten Sheet";
+      if (desc) desc.textContent = "Styling notebook & PDF";
+    }
+  }
 
   const fill = document.getElementById("progress-bar-fill");
   let currentIdx = 0;
