@@ -47,24 +47,28 @@ class AcademicRouter:
         use_gui = False
         gui_target = "auto"
 
-        if any(kw in prompt_lower for kw in ["from claude", "claude ai", "claude web", "use claude"]):
+        if any(kw in prompt_lower for kw in ["all engines", "all web", "combined engines", "use all"]):
+            use_gui = True
+            gui_target = "all"
+            clean_text = re.sub(r"\b(use\s+)?(all\s+engines|all\s+web|combined\s+engines)\b", "", clean_text, flags=re.IGNORECASE).strip()
+        elif any(kw in prompt_lower for kw in ["from claude", "claude ai", "claude web", "use claude", "use clud", "from clud", "on claude"]):
             use_gui = True
             gui_target = "claude"
-            clean_text = re.sub(r"\b(and\s+)?(take|get|fetch)\s+(this\s+)?content\s+from\s+claude(\s+ai)?:?\s*", "", clean_text, flags=re.IGNORECASE).strip()
-            clean_text = re.sub(r"\b(use\s+)?claude(\s+ai)?(\s+web)?(\s+to)?\b", "", clean_text, flags=re.IGNORECASE).strip()
-            clean_text = re.sub(r"\b(from|on)\s+claude(\s+ai)?\b", "", clean_text, flags=re.IGNORECASE).strip()
-        elif any(kw in prompt_lower for kw in ["from gemini", "gemini web", "use gemini"]):
+            clean_text = re.sub(r"\b(and\s+)?(take|get|fetch)\s+(this\s+)?content\s+from\s+(claude|clud|claud)(\s+ai)?:?\s*", "", clean_text, flags=re.IGNORECASE).strip()
+            clean_text = re.sub(r"\b(use\s+)?(claude|clud|claud)(\s+ai)?(\s+web)?(\s+to)?\b", "", clean_text, flags=re.IGNORECASE).strip()
+            clean_text = re.sub(r"\b(from|on)\s+(claude|clud|claud)(\s+ai)?\b", "", clean_text, flags=re.IGNORECASE).strip()
+        elif any(kw in prompt_lower for kw in ["from gemini", "gemini web", "use gemini", "use gemeni", "from gemeni", "use gemni", "gemeni web", "gemni web"]):
             use_gui = True
             gui_target = "gemini"
-            clean_text = re.sub(r"\b(and\s+)?(take|get|fetch)\s+(this\s+)?content\s+from\s+gemini(\s+ai)?:?\s*", "", clean_text, flags=re.IGNORECASE).strip()
-            clean_text = re.sub(r"\b(use\s+)?gemini(\s+ai)?(\s+web)?(\s+to)?\b", "", clean_text, flags=re.IGNORECASE).strip()
-            clean_text = re.sub(r"\b(from|on)\s+gemini\b", "", clean_text, flags=re.IGNORECASE).strip()
-        elif any(kw in prompt_lower for kw in ["from perplexity", "perplexity web", "use perplexity"]):
+            clean_text = re.sub(r"\b(and\s+)?(take|get|fetch)\s+(this\s+)?content\s+from\s+(gemini|gemeni|gemni)(\s+ai)?:?\s*", "", clean_text, flags=re.IGNORECASE).strip()
+            clean_text = re.sub(r"\b(use\s+)?(gemini|gemeni|gemni)(\s+ai)?(\s+web)?(\s+to)?\b", "", clean_text, flags=re.IGNORECASE).strip()
+            clean_text = re.sub(r"\b(from|on)\s+(gemini|gemeni|gemni)\b", "", clean_text, flags=re.IGNORECASE).strip()
+        elif any(kw in prompt_lower for kw in ["from perplexity", "perplexity web", "use perplexity", "use perpelexcity", "from perpelexcity"]):
             use_gui = True
             gui_target = "perplexity"
-            clean_text = re.sub(r"\b(and\s+)?(take|get|fetch)\s+(this\s+)?content\s+from\s+perplexity:?\s*", "", clean_text, flags=re.IGNORECASE).strip()
-            clean_text = re.sub(r"\b(use\s+)?perplexity(\s+ai)?(\s+web)?(\s+to)?\b", "", clean_text, flags=re.IGNORECASE).strip()
-            clean_text = re.sub(r"\b(from|on)\s+perplexity\b", "", clean_text, flags=re.IGNORECASE).strip()
+            clean_text = re.sub(r"\b(and\s+)?(take|get|fetch)\s+(this\s+)?content\s+from\s+(perplexity|perpelexcity):?\s*", "", clean_text, flags=re.IGNORECASE).strip()
+            clean_text = re.sub(r"\b(use\s+)?(perplexity|perpelexcity)(\s+ai)?(\s+web)?(\s+to)?\b", "", clean_text, flags=re.IGNORECASE).strip()
+            clean_text = re.sub(r"\b(from|on)\s+(perplexity|perpelexcity)\b", "", clean_text, flags=re.IGNORECASE).strip()
         elif any(kw in prompt_lower for kw in ["gui agent", "browser agent", "browse google", "search on google", "use google"]):
             use_gui = True
             gui_target = "google" if "google" in prompt_lower else "perplexity"
@@ -121,8 +125,11 @@ class AcademicRouter:
         clean_topic = re.sub(r"\beasy\s+to\s+(undertand|understand).*$", "", clean_topic, flags=re.IGNORECASE).strip()
         clean_topic = re.sub(r"\bpoint\s+to\s+point\s+notes.*$", "", clean_topic, flags=re.IGNORECASE).strip()
         clean_topic = re.sub(r"\bfor\s+(exam|semester|revision).*$", "", clean_topic, flags=re.IGNORECASE).strip()
+        clean_topic = re.sub(r"\b(in\s+simple\s+words?|in\s+easy\s+words?|simple\s+words?)\b", "", clean_topic, flags=re.IGNORECASE).strip()
+        clean_topic = re.sub(r"\b(use\s+)?(gemini|gemeni|gemni|claude|clud|claud|perplexity|perpelexcity)\b", "", clean_topic, flags=re.IGNORECASE).strip()
 
         # Fix common spelling typos & canonical casings
+        clean_topic = re.sub(r"\b(rgae|ragg)\b", "RAG", clean_topic, flags=re.IGNORECASE)
         clean_topic = re.sub(r"\bopen\s*cv\b", "OpenCV", clean_topic, flags=re.IGNORECASE)
         clean_topic = re.sub(r"\benginearing\b", "Engineering", clean_topic, flags=re.IGNORECASE)
         clean_topic = re.sub(r"\bphysic\b", "Physics", clean_topic, flags=re.IGNORECASE)
@@ -176,23 +183,23 @@ class AcademicRouter:
         # Model friendly name
         model_name = chosen_model.split("/")[-1].upper()
 
-        # 3. Create Professional Academic Briefing
+        # 3. Create Universal Knowledge Briefing
         if use_gui:
             briefing = (
                 f"🤖 **Human GUI Browser Agent**: Operating **{gui_target.upper()} Web** | "
-                f"Topic: **{final_topic}** | Reference: *{target_book}*"
+                f"Topic: **{final_topic}**"
             )
         else:
             briefing = (
-                f"🎯 **Academic Focus**: **{subject_name}** | Topic: **{final_topic}** | "
-                f"Reference: *{target_book}* | Engine: **{model_name}**"
+                f"🎯 **Topic Focus**: **{final_topic}** | "
+                f"Domain: **{subject_name}** | Engine: **{model_name}**"
             )
 
-        # 4. Generate Authoritative Search Queries
+        # 4. Generate Comprehensive Search Queries
         queries = [
-            f'"{final_topic}" "{target_book}" lecture notes formulas',
-            f'"{final_topic}" {subject_name} university study sheet explanation',
-            f'"{final_topic}" comprehensive academic guide filetype:pdf'
+            f'"{final_topic}" comprehensive study guide and key concepts',
+            f'"{final_topic}" working mechanism and practical examples',
+            f'"{final_topic}" core definitions and explanation'
         ]
 
         return StudyIntent(

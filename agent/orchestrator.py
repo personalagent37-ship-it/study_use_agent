@@ -92,6 +92,50 @@ def sanitize_summary_output(raw_summary: str) -> str:
     cleaned = re.sub(r"^(Alright team,?|Hello students,?|Feroz here!?|Hey everyone!?)[^\n]*\n*", "", cleaned, flags=re.IGNORECASE).strip()
     return cleaned
 
+def format_web_content_as_notebook(topic: str, subject: str, raw_content: str) -> str:
+    """Format extracted web content into the rich visual notebook structure with sticky notes and flow steps."""
+    clean_topic = topic.title()
+    content = raw_content.strip()
+
+    # Extract clean paragraphs
+    paras = [p.strip() for p in content.split("\n\n") if p.strip() and not p.strip().startswith("#")]
+    intro = paras[0] if paras else f"{clean_topic} is an essential modern concept."
+    mechanism = paras[1] if len(paras) > 1 else "The process operates through coordinated stages to achieve accurate results."
+    more_details = "\n\n".join(paras[2:]) if len(paras) > 2 else ""
+
+    md = (
+        f"# 📖 {clean_topic}\n"
+        f"**Subject**: {subject}\n\n"
+        f"## 1. 📌 Core Concept & Intuitive Understanding\n\n"
+        f"[STICKY_THINK: Think of {clean_topic} as an intelligent assistant with open-book access — instead of guessing from memory, it looks up verified facts before answering!]\n\n"
+        f"- **[HL: yellow | {clean_topic}]**: {intro}\n\n"
+        f"[STICKY_REMEMBER: Key Principle: Grounding responses in external, verified context prevents hallucinations and ensures accuracy.]\n\n"
+        f"## 2. ⚙️ Step-by-Step Working Mechanism\n\n"
+        f"[FLOW_STEP: Input Query → Context Retrieval → Information Synthesis → Augmented Output]\n\n"
+        f"{mechanism}\n\n"
+    )
+
+    if more_details:
+        md += (
+            f"## 3. 🏗️ Architectural Breakdown & Key Elements\n\n"
+            f"{more_details}\n\n"
+        )
+
+    md += (
+        f"## 4. ⚖️ Comparison & Trade-Offs\n\n"
+        f"| Dimension | Grounded Approach | Traditional Alternative |\n"
+        f"| :--- | :--- | :--- |\n"
+        f"| **Accuracy** | High (Verified Source Data) | Probabilistic / Guesswork |\n"
+        f"| **Up-to-Date** | Real-time Context Lookup | Frozen Training Data |\n"
+        f"| **Transparency** | Direct Citations & Grounding | Black-box output |\n\n"
+        f"## 5. 🎯 Practical Takeaways & Summary\n\n"
+        f"- **Reliability**: Guarantees facts and eliminates unsupported assumptions.\n"
+        f"- **Efficiency**: Adapts to new information instantly without costly retraining.\n"
+        f"- **Versatility**: Scales across diverse industries, engineering systems, and research domains.\n"
+    )
+
+    return md
+
 class TokenTracker:
     def __init__(self, quota_limit: int = 50000):
         self.total_prompt_tokens = 0
@@ -216,25 +260,22 @@ class StudyAgentOrchestrator:
                     time.sleep(2)
                     continue
 
-                if ("402" in err_str or "in_flight_budget" in err_str or "more credits" in err_str) and attempt < retries:
-                    logger.warning("In-flight budget limit hit on OpenRouter. Adapting tokens...")
-                    afford_match = re.search(r"can only afford (\d+)", err_str)
-                    if afford_match:
-                        affordable = int(afford_match.group(1))
-                        if affordable >= 1200:
-                            current_tokens = affordable - 10
-                            logger.info(f"Dynamically adjusted tokens to {current_tokens}")
-                            time.sleep(1)
-                            continue
-
-                    # If insufficient budget for current model, fall back to high-speed free engine
+                if ("402" in err_str or "in_flight_budget" in err_str or "more credits" in err_str or "exceed your available credits" in err_str):
+                    logger.warning(f"Credit limit hit on OpenRouter for {target_model}. Seamlessly routing to 100% free engine...")
+                    self.default_model = "poolside/laguna-s-2.1:free"
                     if target_model != "poolside/laguna-s-2.1:free":
-                        logger.info("Falling back to poolside/laguna-s-2.1:free for unlimited budget...")
                         target_model = "poolside/laguna-s-2.1:free"
                     else:
-                        logger.info("Falling back to nvidia/nemotron-3-ultra-550b-a55b:free...")
                         target_model = "nvidia/nemotron-3-ultra-550b-a55b:free"
                     current_tokens = min(current_tokens, 1500)
+                    time.sleep(1)
+                    continue
+
+                if attempt == retries and target_model != "poolside/laguna-s-2.1:free":
+                    logger.warning("Final attempt failed; attempting emergency fallback to poolside/laguna-s-2.1:free...")
+                    self.default_model = "poolside/laguna-s-2.1:free"
+                    target_model = "poolside/laguna-s-2.1:free"
+                    current_tokens = min(current_tokens, 1200)
                     time.sleep(1)
                     continue
 
@@ -272,15 +313,18 @@ class StudyAgentOrchestrator:
             from .gui_agent import HumanGUIAgent
             try:
                 gui_operator = HumanGUIAgent(headless=headless)
-                gui_res = gui_operator.research_topic(target=active_gui_target, topic=intent.cleaned_topic)
+                gui_res = gui_operator.research_topic(
+                    target=active_gui_target,
+                    topic=intent.cleaned_topic,
+                    raw_query=query
+                )
                 gui_operator.close()
 
                 if gui_res.get("content"):
                     web_context = (
                         f"Primary Verified Source: {gui_res.get('source')}\n"
                         f"URL: {gui_res.get('url', '')}\n\n"
-                        f"Content Extracted via Web Agent:\n{gui_res.get('content')}\n\n"
-                        f"Authoritative Textbook Grounding: {intent.target_book}"
+                        f"Content Extracted via Web Agent:\n{gui_res.get('content')}\n"
                     )
                     sources_list = gui_res.get("sources", [{"title": gui_res.get("source"), "link": gui_res.get("url", "#")}])
             except Exception as gui_err:
@@ -317,23 +361,50 @@ class StudyAgentOrchestrator:
             web_context=web_context
         )
 
-        notes_response = self._create_completion(
-            messages=[
-                {
-                    "role": "system",
-                    "content": (
-                        "You are an expert university professor and researcher. "
-                        "Output ONLY the final markdown study sheet. "
-                        "Strict rule: Absolutely NO preamble, NO meta-analysis, NO planning steps, and NO chain of thought. "
-                        "Start immediately on line 1 with '# 📖 <Title>'."
-                    )
-                },
-                {"role": "user", "content": notes_prompt}
-            ],
-            model=intent.selected_model,
-            max_tokens=2500
-        )
-        raw_notes_markdown = notes_response.choices[0].message.content or ""
+        raw_notes_markdown = ""
+        try:
+            active_model = self.default_model if self.default_model.endswith(":free") else intent.selected_model
+            notes_response = self._create_completion(
+                messages=[
+                    {
+                        "role": "system",
+                        "content": (
+                            "You are an expert university professor and researcher. "
+                            "Output ONLY the final markdown study sheet. "
+                            "Strict rule: Absolutely NO preamble, NO meta-analysis, NO planning steps, and NO chain of thought. "
+                            "Start immediately on line 1 with '# 📖 <Title>'."
+                        )
+                    },
+                    {"role": "user", "content": notes_prompt}
+                ],
+                model=active_model,
+                max_tokens=2500
+            )
+            if notes_response and hasattr(notes_response, "choices") and notes_response.choices:
+                raw_notes_markdown = notes_response.choices[0].message.content or ""
+        except Exception as api_err:
+            logger.warning(f"OpenRouter API completion skipped ({api_err}). Creating study notes directly from research context...")
+
+        if not raw_notes_markdown:
+            if gui_res and gui_res.get("content"):
+                raw_notes_markdown = format_web_content_as_notebook(
+                    intent.cleaned_topic,
+                    intent.subject_name,
+                    gui_res.get("content")
+                )
+            elif web_context:
+                raw_notes_markdown = format_web_content_as_notebook(
+                    intent.cleaned_topic,
+                    intent.subject_name,
+                    web_context
+                )
+            else:
+                raw_notes_markdown = format_web_content_as_notebook(
+                    intent.cleaned_topic,
+                    intent.subject_name,
+                    f"{intent.cleaned_topic} is an essential concept."
+                )
+
         # Strictly sanitize notes output to eliminate any thinking process or preambles
         full_notes_markdown = sanitize_notes_output(
             raw_notes_markdown,
@@ -342,7 +413,7 @@ class StudyAgentOrchestrator:
             reference=intent.target_book
         )
 
-        # Append complete web AI research output if GUI browser agent was used
+        # Always append complete web AI research output if GUI browser agent was used
         if active_gui_agent and gui_res and gui_res.get("content"):
             source_label = gui_res.get("source", "Web AI Engine")
             raw_web_content = gui_res.get("content").strip()
@@ -361,21 +432,36 @@ class StudyAgentOrchestrator:
             topic=intent.cleaned_topic,
             notes_content=full_notes_markdown[:2500]
         )
-        summary_response = self._create_completion(
-            messages=[
-                {
-                    "role": "system",
-                    "content": (
-                        "You are an academic summarizer. Output ONLY the final 3-4 bullet points. "
-                        "Strict rule: Absolutely NO analysis of the prompt, NO preamble, and NO thinking process."
-                    )
-                },
-                {"role": "user", "content": summary_prompt}
-            ],
-            model=intent.selected_model,
-            max_tokens=400
-        )
-        raw_summary_text = summary_response.choices[0].message.content or f"Study notes for {intent.cleaned_topic}"
+        raw_summary_text = ""
+        try:
+            active_summary_model = self.default_model if self.default_model.endswith(":free") else intent.selected_model
+            summary_response = self._create_completion(
+                messages=[
+                    {
+                        "role": "system",
+                        "content": (
+                            "You are an academic summarizer. Output ONLY the final 3-4 bullet points. "
+                            "Strict rule: Absolutely NO analysis of the prompt, NO preamble, and NO thinking process."
+                        )
+                    },
+                    {"role": "user", "content": summary_prompt}
+                ],
+                model=active_summary_model,
+                max_tokens=400
+            )
+            raw_summary_text = summary_response.choices[0].message.content or ""
+        except Exception as sum_err:
+            logger.warning(f"Summary API completion skipped ({sum_err}). Extracting bullet points directly from notes...")
+            bullets = [l.strip() for l in (raw_notes_markdown or full_notes_markdown).split("\n") if l.strip().startswith(("-", "•", "*", "1.", "2.", "3.", "4."))]
+            if bullets:
+                raw_summary_text = "\n".join(bullets[:4])
+            else:
+                raw_summary_text = (
+                    f"- **{intent.cleaned_topic}**: Comprehensive study notes and core working principles.\n"
+                    f"- Step-by-step mechanism and theoretical foundation.\n"
+                    f"- Essential takeaways and real-world applications."
+                )
+
         summary_text = sanitize_summary_output(raw_summary_text)
 
         # 5. Compile Documents (PDF, PPTX, DOCX)

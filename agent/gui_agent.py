@@ -398,14 +398,16 @@ class HumanGUIAgent:
                 "error": str(e)
             }
 
-    def research_all(self, topic: str, prompt: Optional[str] = None) -> Dict[str, Any]:
+    def research_all(self, topic: str, prompt: Optional[str] = None, raw_query: Optional[str] = None) -> Dict[str, Any]:
         """Collect and combine grounded research across web platforms (Perplexity, Claude, Gemini, Google)."""
-        query_prompt = prompt or f"Provide detailed academic explanations, core definitions, mechanisms, and key formulas for: {topic}"
+        from .prompt_engineer import HumanPromptEngineer
+
+        query_prompt = prompt or HumanPromptEngineer.craft_prompt(topic, platform="all", raw_query=raw_query or topic)
         sections = []
         combined_sources = []
 
         # 1. Perplexity (Instant Web Research)
-        p_res = self.research_perplexity(f"Comprehensive academic study notes and key formulas for: {topic}")
+        p_res = self.research_perplexity(query_prompt)
         if p_res.get("content"):
             sections.append(f"### 🟢 Output from Perplexity AI Web\n\n{p_res.get('content')}")
             combined_sources.extend(p_res.get("sources", []))
@@ -440,19 +442,32 @@ class HumanGUIAgent:
     # --------------------------------------------------------------------------
     # UNIFIED ENTRYPOINT
     # --------------------------------------------------------------------------
-    def research_topic(self, target: str, topic: str, prompt: Optional[str] = None) -> Dict[str, Any]:
-        """Route to appropriate web operator based on user intent."""
+    def research_topic(
+        self,
+        target: str,
+        topic: str,
+        prompt: Optional[str] = None,
+        raw_query: Optional[str] = None
+    ) -> Dict[str, Any]:
+        """Route to appropriate web operator based on user intent with HumanPromptEngineer."""
+        from .prompt_engineer import HumanPromptEngineer
+
         target_lower = (target or "perplexity").lower().strip()
-        query_prompt = prompt or f"Provide detailed academic textbook explanations, core definitions, mechanisms, and key formulas for: {topic}"
+        query_prompt = prompt or HumanPromptEngineer.craft_prompt(
+            topic=topic,
+            platform=target_lower,
+            raw_query=raw_query or topic
+        )
+        logger.info(f"🤖 [Human Prompt Engineer] Crafted prompt for {target_lower.upper()}:\n{query_prompt}")
 
         if any(w in target_lower for w in ["all", "combined", "multi", "both"]):
-            return self.research_all(topic, prompt)
+            return self.research_all(topic, prompt=query_prompt, raw_query=raw_query)
 
         elif "claude" in target_lower:
             res = self.research_claude(query_prompt)
             if res.get("needs_login") or not res.get("success"):
                 logger.warning("Claude Web requires login. Auto-routing to Perplexity Web for instant research...")
-                fallback = self.research_perplexity(f"Comprehensive academic explanation of {topic}")
+                fallback = self.research_perplexity(query_prompt)
                 fallback["warning"] = "Claude AI requires login in Chrome. Automatically retrieved authoritative content via Perplexity Web."
                 return fallback
             return res
@@ -461,7 +476,7 @@ class HumanGUIAgent:
             res = self.research_gemini(query_prompt)
             if res.get("needs_login") or not res.get("success"):
                 logger.warning("Gemini Web requires Google login. Auto-routing to Perplexity Web...")
-                fallback = self.research_perplexity(f"Comprehensive academic explanation of {topic}")
+                fallback = self.research_perplexity(query_prompt)
                 fallback["warning"] = "Google Gemini requires login in Chrome. Automatically retrieved authoritative content via Perplexity Web."
                 return fallback
             return res
@@ -470,7 +485,7 @@ class HumanGUIAgent:
             return self.research_google(topic)
 
         else:
-            return self.research_perplexity(f"Academic study guide, definitions, mechanisms, and formulas for: {topic}")
+            return self.research_perplexity(query_prompt)
 
     def close(self):
         """Safely shut down the browser session."""
