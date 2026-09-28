@@ -22,8 +22,29 @@ from selenium.webdriver.support import expected_conditions as EC
 
 logger = logging.getLogger(__name__)
 
-DEFAULT_CHROMEDRIVER_PATH = "/home/talha/.wdm/drivers/chromedriver/linux64/152.0.7977.82/chromedriver-linux64/chromedriver"
 DEFAULT_PROFILE_DIR = Path(__file__).resolve().parent.parent / ".gui_agent_profile"
+
+def resolve_chromedriver_path() -> str:
+    """Dynamically resolve matching ChromeDriver binary for the installed Chrome version."""
+    try:
+        from webdriver_manager.chrome import ChromeDriverManager
+        path = ChromeDriverManager().install()
+        if Path(path).exists() and os.access(path, os.X_OK):
+            return path
+    except Exception as e:
+        logger.warning(f"webdriver_manager resolution notice: {e}")
+
+    wdm_base = Path("/home/talha/.wdm/drivers/chromedriver/linux64")
+    if wdm_base.exists():
+        matching = sorted(list(wdm_base.glob("*/chromedriver-linux64/chromedriver")), reverse=True)
+        if matching and matching[0].exists():
+            return str(matching[0])
+
+    for sys_path in ["/usr/bin/chromedriver", "/usr/local/bin/chromedriver"]:
+        if Path(sys_path).exists():
+            return sys_path
+
+    return "/usr/bin/chromedriver"
 
 class HumanGUIAgent:
     """Autonomous Web Operator that interacts with web platforms like a human student."""
@@ -32,7 +53,7 @@ class HumanGUIAgent:
         self,
         headless: bool = False,
         profile_dir: Optional[Path] = None,
-        chromedriver_path: str = DEFAULT_CHROMEDRIVER_PATH,
+        chromedriver_path: Optional[str] = None,
         display: str = ":0"
     ):
         self.headless = headless
@@ -71,6 +92,12 @@ class HumanGUIAgent:
         if self.headless:
             options.add_argument("--headless=new")
         
+        # Explicit Chrome binary location
+        for bin_candidate in ["/usr/bin/google-chrome", "/opt/google/chrome/google-chrome", "/usr/bin/chromium-browser"]:
+            if Path(bin_candidate).exists():
+                options.binary_location = bin_candidate
+                break
+
         options.add_argument(f"--user-data-dir={str(self.profile_dir)}")
         options.add_argument("--no-sandbox")
         options.add_argument("--disable-dev-shm-usage")
@@ -81,12 +108,21 @@ class HumanGUIAgent:
         options.add_experimental_option("excludeSwitches", ["enable-automation"])
         options.add_experimental_option("useAutomationExtension", False)
         options.add_argument(
-            "user-agent=Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/152.0.7977.82 Safari/537.36"
+            "user-agent=Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/154.0.0.0 Safari/537.36"
         )
 
-        service = Service(self.chromedriver_path)
-        logger.info(f"Launching Human GUI Agent Chrome (headless={self.headless}, profile={self.profile_dir})...")
-        self.driver = webdriver.Chrome(service=service, options=options)
+        driver_path = self.chromedriver_path or resolve_chromedriver_path()
+        service = Service(driver_path)
+        logger.info(f"Launching Human GUI Agent Chrome (headless={self.headless}, profile={self.profile_dir}, driver={driver_path})...")
+        try:
+            self.driver = webdriver.Chrome(service=service, options=options)
+        except Exception as launch_err:
+            logger.warning(f"Initial ChromeDriver launch failed ({launch_err}). Resolving fresh driver via webdriver_manager...")
+            from webdriver_manager.chrome import ChromeDriverManager
+            driver_path = ChromeDriverManager().install()
+            service = Service(driver_path)
+            self.driver = webdriver.Chrome(service=service, options=options)
+
         self.driver.set_page_load_timeout(35)
 
         # Stealth: mask navigator.webdriver

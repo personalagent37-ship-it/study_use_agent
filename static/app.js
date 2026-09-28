@@ -208,16 +208,19 @@ function initGuiAgentControls() {
   if (topicInput) {
     topicInput.addEventListener("input", (e) => {
       const text = e.target.value.toLowerCase();
-      if (text.includes("claude")) {
+      if (/\b(all engines|all web|combined|both engines)\b/.test(text) || (/\b(perpelixity|perplexity)\b/.test(text) && /\b(claude|clud)\b/.test(text))) {
+        setEngineMode(true);
+        setGuiTarget("all");
+      } else if (/\b(claude|clud|claud|cloude)\b/.test(text)) {
         setEngineMode(true);
         setGuiTarget("claude");
-      } else if (text.includes("gemini web") || (text.includes("from gemini") && !text.includes("flash"))) {
+      } else if (/\b(gemini|gemeni|gemni)\s*(web)?\b/.test(text) && !text.includes("flash")) {
         setEngineMode(true);
         setGuiTarget("gemini");
-      } else if (text.includes("perplexity") || text.includes("from perplexity")) {
+      } else if (/\b(perplexity|perpelixity|perpelexcity|perpelxity)\b/.test(text)) {
         setEngineMode(true);
         setGuiTarget("perplexity");
-      } else if (text.includes("gui agent") || text.includes("browser agent") || text.includes("google search")) {
+      } else if (/\b(gui agent|browser agent|google search)\b/.test(text)) {
         setEngineMode(true);
         setGuiTarget("google");
       }
